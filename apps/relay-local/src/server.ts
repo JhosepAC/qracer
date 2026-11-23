@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { health, MAX_MESSAGE_BYTES, parseClientMessage, PROTOCOL_VERSION } from "@qracer/protocol";
 import { WebSocketServer } from "ws";
+import { createProbe } from "./probe.ts";
 
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -24,8 +25,13 @@ function inside(root: string, file: string): boolean {
   return !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`);
 }
 
-export function createRelay(options: { staticDir?: string; allowedOrigins: string[] }) {
+export function createRelay(options: {
+  staticDir?: string;
+  allowedOrigins: string[];
+  probeKey?: string;
+}) {
   const origins = new Set(options.allowedOrigins);
+  const probe = createProbe(origins, options.probeKey);
   const sockets = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_MESSAGE_BYTES,
@@ -34,6 +40,7 @@ export function createRelay(options: { staticDir?: string; allowedOrigins: strin
   const server = createServer(async (request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
+    if (probe.request(request, response)) return;
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.writeHead(405, { Allow: "GET, HEAD" }).end();
       return;
@@ -78,6 +85,7 @@ export function createRelay(options: { staticDir?: string; allowedOrigins: strin
     }
   });
   server.on("upgrade", (request, socket, head) => {
+    if (probe.upgrade(request, socket, head)) return;
     if (
       request.url !== "/ws" ||
       !origins.has(request.headers.origin ?? "") ||
@@ -117,6 +125,7 @@ export function createRelay(options: { staticDir?: string; allowedOrigins: strin
   return {
     server,
     close: async () => {
+      await probe.close();
       for (const peer of sockets.clients) peer.terminate();
       await new Promise<void>((done) => sockets.close(() => done()));
       await new Promise<void>((done) => server.close(() => done()));
