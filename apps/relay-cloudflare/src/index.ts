@@ -2,9 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import { health } from "@qracer/protocol";
 import type { ProbeEnv } from "./probe-room.ts";
 import { routeProbe } from "./probe-router.ts";
+import type { SessionEnv } from "./session-room.ts";
+import { routeSession } from "./session-router.ts";
 export { ProbeRoom } from "./probe-room.ts";
+export { SessionBudget } from "./session-budget.ts";
+export { SessionRoom } from "./session-room.ts";
 
-interface Env extends ProbeEnv {
+interface Env extends ProbeEnv, SessionEnv {
   ROOMS: DurableObjectNamespace<Room>;
   LOCAL_DIAGNOSTICS: string;
 }
@@ -24,6 +28,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const probe = await routeProbe(request, env);
     if (probe) return probe;
+    const session = await routeSession(request, env);
+    if (session) return session;
     if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
     const path = new URL(request.url).pathname;
     if (path === "/health")

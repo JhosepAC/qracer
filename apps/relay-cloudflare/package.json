@@ -9,10 +9,11 @@
   },
   "dependencies": {
     "@qracer/probe": "workspace:*",
-    "@qracer/protocol": "workspace:*"
+    "@qracer/protocol": "workspace:*",
+    "@qracer/session-core": "workspace:*"
   },
   "devDependencies": {
-    "wrangler": "4.166.0",
-    "@cloudflare/workers-types": "5.20261120.1"
+    "@cloudflare/workers-types": "5.20261120.1",
+    "wrangler": "4.166.0"
   }
 }

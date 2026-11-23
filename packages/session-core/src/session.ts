@@ -133,11 +133,15 @@ export class RoomSession {
     return true;
   }
 
-  renew(until: number): boolean {
-    if (this.state.ended || !this.state.controller || until <= this.state.leaseUntil) return false;
+  renew(until: number): Effect[] {
+    if (this.state.ended || !this.state.controller || until <= this.state.leaseUntil) return [];
     this.state.leaseUntil = Math.min(until, this.state.hardUntil);
     this.revision++;
-    return true;
+    return this.stateEffects();
+  }
+
+  stopAtQuota(): Effect[] {
+    return this.end("QUOTA_EXHAUSTED");
   }
 
   private identified(id: string) {
