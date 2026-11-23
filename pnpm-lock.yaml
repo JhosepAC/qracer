@@ -225,6 +225,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@qracer/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
       '@qracer/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -238,6 +241,8 @@ importers:
       '@types/three':
         specifier: 0.187.0
         version: 0.187.0
+
+  packages/game-core: {}
 
   packages/probe:
     dependencies:
