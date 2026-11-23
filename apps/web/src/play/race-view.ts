@@ -215,7 +215,9 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     const moving = [hero, traffic, shadows].flat();
     const environment = [...roads.values(), palms, cliffs, towers].flat();
     let lastSegment = Number.NaN;
-    let lastDraw: (() => void) | undefined;
+    let lastPrevious: Race | undefined;
+    let lastCurrent: Race | undefined;
+    let lastAlpha = 0;
 
     function draw(previous: Race, current: Race, alpha: number) {
       const p = previous.driver;
@@ -279,10 +281,10 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
-      roadPose(distance - 8.5, lateral * 0.57, origin, pose);
-      camera.position.set(pose.x, 4, pose.z);
+      roadPose(distance - 9.5, lateral * 0.57, origin, pose);
+      camera.position.set(pose.x, 4.45, pose.z);
       roadPose(distance + 23, lateral * 0.15, origin, pose);
-      camera.lookAt(pose.x, 1.35, pose.z);
+      camera.lookAt(pose.x, 0.35, pose.z);
       renderer.render(scene, camera);
     }
 
@@ -301,13 +303,15 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     signal.throwIfAborted();
     observer = new ResizeObserver(() => {
       resize();
-      lastDraw?.();
+      if (lastPrevious && lastCurrent) draw(lastPrevious, lastCurrent, lastAlpha);
     });
     observer.observe(container);
     return {
       draw(previous: Race, current: Race, alpha: number) {
         draw(previous, current, alpha);
-        lastDraw = () => draw(previous, current, alpha);
+        lastPrevious = previous;
+        lastCurrent = current;
+        lastAlpha = alpha;
       },
       dispose,
       canvas: renderer.domElement,
@@ -316,6 +320,8 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
         triangles: renderer.info.render.triangles,
         geometries: renderer.info.memory.geometries,
         textures: renderer.info.memory.textures,
+        width: renderer.domElement.width,
+        height: renderer.domElement.height,
       }),
     };
   } catch (error) {

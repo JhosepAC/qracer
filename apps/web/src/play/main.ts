@@ -114,6 +114,7 @@ let lastHud = -Infinity;
 
 function updateHud() {
   const state = clock.current;
+  if (view && !contextLost) preview.dataset.renderStats = JSON.stringify(view.stats());
   speed.textContent = String(Math.round(state.driver.speed * 3.6));
   distance.textContent = `${Math.floor(state.driver.s)} m`;
   score.textContent = String(state.score);
@@ -243,6 +244,7 @@ window.addEventListener("pagehide", () => {
   view?.dispose();
   view = undefined;
   delete preview.dataset.graphics;
+  delete preview.dataset.renderStats;
   start.disabled = resume.disabled = restart.disabled = true;
 });
 window.addEventListener("pageshow", (event) => {
