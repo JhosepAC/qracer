@@ -16,6 +16,7 @@ export interface ProbeEnv {
 
 /** F02 only: SQLite metadata + socket attachments, no per-input database writes/timers. */
 export class ProbeRoom extends DurableObject<ProbeEnv> {
+  private readonly bootId = crypto.randomUUID();
   private session: ProbeSession | undefined;
   private sockets = new Map<string, WebSocket>();
   constructor(ctx: DurableObjectState, env: ProbeEnv) {
@@ -107,6 +108,8 @@ export class ProbeRoom extends DurableObject<ProbeEnv> {
     if (!message || !this.session) return socket.close(1008, "Invalid message");
     const wasUsed = this.session.used;
     const result = this.session.handle(peer.id, message, Date.now());
+    for (const effect of result.send)
+      if (effect.body.type === "STATS") effect.body.bootId = this.bootId;
     socket.serializeAttachment(this.session.peers.get(peer.id));
     if (!wasUsed && this.session.used) await this.ctx.storage.put("used", true);
     this.deliver(result.send);
