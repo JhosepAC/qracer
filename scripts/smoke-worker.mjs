@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { smokeProbeWorker, testProbeKey } from "./probe-worker.mjs";
+import { exerciseSession } from "./session-smoke.mjs";
 
 const cwd = fileURLToPath(new URL("../apps/relay-cloudflare/", import.meta.url));
 for (const environment of ["local", "production"]) {
@@ -60,8 +61,15 @@ for (const environment of ["local", "production"]) {
       if ((await response.json()).storage !== "sqlite-ready")
         throw new Error("SQLite binding failed");
       await smokeProbeWorker(origin);
-    } else if (response.status !== 404)
-      throw new Error("Production diagnostics must remain disabled");
+      const restored = await exerciseSession(origin, "http://127.0.0.1:8787", { idleMs: 12000 });
+      if (!restored.constructorRestarted)
+        throw new Error("Session constructor did not restart after idle");
+      console.log("Session pairing, lease admission and restoration after hibernation passed.");
+    } else {
+      if (response.status !== 404) throw new Error("Production diagnostics must remain disabled");
+      if ((await fetch(`${origin}/session`, { method: "POST" })).status !== 404)
+        throw new Error("Production pairing requires an explicit origin configuration");
+    }
     console.log(`Worker ${environment} smoke passed (local emulation only).`);
   } finally {
     if (child.exitCode === null) {

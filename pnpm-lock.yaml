@@ -199,6 +199,9 @@ importers:
       '@qracer/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@qracer/session-core':
+        specifier: workspace:*
+        version: link:../../packages/session-core
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20261120.1
