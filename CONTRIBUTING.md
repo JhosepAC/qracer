@@ -11,17 +11,16 @@ Las versiones están fijadas; no regenerar dependencias con `latest`.
 - `main` es la única rama permanente. Crear ramas cortas como `feat/f01-web-entries`.
 - Una rama entrega un incremento revisable; no una fase completa. Integrar frecuentemente.
 - Cada PR modifica **como máximo 12 archivos**, incluidos archivos añadidos o borrados.
-- Apuntar a menos de 800 líneas de código cambiadas por PR. Separar refactors y features.
+- Modificar como máximo 800 líneas por PR; el lockfile generado se identifica aparte. Separar refactors y features.
 - Identificar lockfiles generados y cambios de dependencias; no mezclarlos con miles de líneas de producto.
 - Hacer varios commits coherentes con Conventional Commits; evitar un único commit gigante.
 - Revisar diff, checks y evidencia antes de integrar mediante squash; no forzar `main`.
 
-Los incrementos dependientes pueden revisarse como PR apilados. Cada uno apunta a su
-predecesor para conservar el límite de archivos. Tras integrar un padre por squash,
-rebasar únicamente los commits propios del hijo sobre `origin/main`, actualizar su base
-y volver a comprobar el diff antes de integrar. Aplicar el mismo procedimiento a los
-descendientes. No retargetear toda la pila a `main` sin rebasarla: mostraría cambios ya
-integrados. Una actualización reescrita solo usa `--force-with-lease` en ramas propias.
+Preferir incrementos secuenciales: crear cada rama desde `main` después de integrar
+la anterior. Un PR aprobado que se fusiona en una rama ya integrada no lleva sus
+cambios a `main`. Si se usa una pila excepcional, rebasar los commits propios del
+hijo sobre `origin/main`, cambiar su base y revisar de nuevo el diff tras cada squash.
+Nunca fusionar en un padre obsoleto ni forzar `main`.
 
 ## Conventional Commits
 

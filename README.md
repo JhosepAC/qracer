@@ -2,7 +2,9 @@
 
 Juego arcade 3D para navegador de PC, controlado desde un teléfono mediante un código QR. El mando web funciona sin instalar una aplicación; gráficos, conexión y controles cuentan con alternativas según las capacidades del dispositivo.
 
-**Estado:** implementación de F01, base del entorno y aplicaciones independientes. Las mecánicas de conducción y vinculación se desarrollarán en fases posteriores.
+**Estado:** F01 integrada; F02 en validación con QR, controles táctiles/sensores,
+relay local/Free y escena 3D de estrés. Es un laboratorio de viabilidad, previo
+al juego completo. Instrucciones reproducibles en [PROBES.md](PROBES.md).
 
 - [Instrucciones para agentes](AGENTS.md)
 
@@ -18,7 +20,9 @@ pnpm dev
 ```
 
 Abrir [PC](http://127.0.0.1:5173/play/) o [mando](http://127.0.0.1:5173/controller/).
-Son aplicaciones independientes: el renderer se carga únicamente en PC. El coche es una vista previa provisional; vinculación QR, sensores y conducción aún no están implementados.
+Son aplicaciones independientes: el renderer se carga únicamente en PC.
+`/play/` y `/controller/` conservan el esqueleto de F01; las pruebas implementadas
+de QR, sensores y movimiento están en `/probe/` y `/probe/controller/`.
 
 ## Relay y distribución local
 
@@ -27,7 +31,9 @@ pnpm build
 pnpm dev:local
 ```
 
-Abrir `http://127.0.0.1:3000/play/`. El relay sirve las aplicaciones compiladas, `/health` y un WebSocket de bootstrap en `/ws`. El socket requiere un origen permitido y `HELLO` antes de `PING`; todavía no crea salas ni autoriza control de juego.
+Abrir `http://127.0.0.1:3000/probe/` para F02. El relay sirve las aplicaciones,
+`/health`, el bootstrap `/ws` y las sesiones aisladas `/probe/session`/`/probe/ws/…`.
+La vinculación definitiva y la política de reconexión pertenecen a F04.
 
 Para cambiar host, puerto y orígenes, copiar `apps/relay-local/.env.example` a `.env` dentro de esa aplicación. LAN requiere configurar host/orígenes explícitamente y permitir solo el puerto necesario; no desactivar firewall ni abrir puertos del router. Los sensores requieren HTTPS de confianza.
 
@@ -59,11 +65,15 @@ pnpm package:local
 
 `pnpm check:pr <rama-base>` limita el PR a 12 archivos y 800 líneas de código/configuración. El lockfile generado sigue contando como archivo, pero se identifica separado del presupuesto de código. La instalación configura un hook local de Conventional Commits sin sustituir hooks personalizados existentes.
 
-CI usa permisos de lectura y acciones fijadas por SHA, y verifica título/commits, tamaño del PR, build, paquete y navegador. No hay despliegue automático. Integrar los PR de F01 en su orden de dependencia; verificar los checks obligatorios de `main` cuando el workflow esté integrado.
+CI usa permisos de lectura y acciones fijadas por SHA, y verifica título/commits,
+tamaño del PR, build, paquete y navegador. No hay despliegue automático.
+`main` requiere los checks `commits` y `quality`, squash y ausencia de force push.
 
 ## Herramientas y licencias
 
-CodeGraph está habilitado localmente sobre el código; el índice no se versiona. Blender MCP se verificó leyendo la escena existente mediante el servidor ya configurado, sin modificarla; los modelos definitivos pertenecen a F06/F08.
+CodeGraph está habilitado sobre el código; el índice no se versiona. Blender MCP
+produjo el coche y kit costero originales de F02, con fuentes editables, QA y LOD.
+Los modelos y ambientes definitivos pertenecen a F06/F08.
 
 El código usa MIT. Los avisos de dependencias runtime se generan con `pnpm check:licenses`; las licencias de assets se conservan por separado. IDE, cachés, secretos, builds, pruebas y planificación local están excluidos mediante `.gitignore`.
 
