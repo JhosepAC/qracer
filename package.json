@@ -1,0 +1,23 @@
+{
+  "name": "qracer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "pnpm": "12.14.0"
+  },
+  "scripts": {
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/node": "24.10.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}
