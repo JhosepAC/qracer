@@ -4,7 +4,7 @@ test("desktop opens the controller through keyboard navigation", async ({ page }
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/play/");
-  await expect(page.getByRole("heading", { name: /Siente cada/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Circuito costero" })).toBeVisible();
   await expect(page.locator("#app")).toHaveAttribute("data-protocol-version", "1");
   const supportsPreview = (await page.locator("#preview canvas").count()) > 0;
   await page.screenshot({ path: testInfo.outputPath("desktop.png"), fullPage: true });
@@ -14,7 +14,7 @@ test("desktop opens the controller through keyboard navigation", async ({ page }
   await expect(page).toHaveURL(/\/controller\/$/);
   await expect(page.getByRole("heading", { name: /El control/ })).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole("heading", { name: /Siente cada/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Circuito costero" })).toBeVisible();
   if (supportsPreview) {
     // Also exercise BFCache events on engines that disable caching under automation.
     await page.evaluate(() => {

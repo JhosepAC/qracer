@@ -34,14 +34,14 @@
   font-variant-numeric: tabular-nums;
 }
 .pair-dialog {
-  width: min(32rem, calc(100vw - 2rem));
+  width: min(39rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
   overflow: auto;
   color: #f3f6f3;
   box-shadow: 0 1rem 3rem #0008;
 }
 .pair-dialog::backdrop {
-  background: #10171bd9;
+  background: #10171bc9;
 }
 .pair-dialog [hidden] {
   display: none;
@@ -58,6 +58,31 @@
 }
 .pair-header h2 {
   margin: 0;
+}
+.pair-dialog #host-invite:not([hidden]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
+  align-items: start;
+}
+.pair-dialog #host-invite p,
+.pair-dialog #host-invite .pair-form {
+  margin: 0;
+}
+.pair-dialog #invite-time {
+  font: 700 1.22rem / 1 var(--race-display);
+  color: #ffcb47;
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 620px) {
+  .pair-dialog #host-invite:has(.pair-qr:not([hidden])) {
+    grid-template-columns: 13rem minmax(0, 1fr);
+  }
+  .pair-dialog .pair-qr {
+    grid-row: 1 / span 3;
+    margin: 0;
+  }
 }
 .pair-actions .primary {
   width: auto;

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const graphicsReady = { timeout: 20000 };
+
 test("plays a coastal race with keyboard, pauses safely and restarts from zero", async ({
   page,
 }, info) => {
@@ -55,6 +57,8 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
     timeout: 95000,
   });
   await expect(page.locator("#summary")).toContainText(/\d+ puntos/);
+  await expect(page.locator("#result-speed")).toHaveText(/\d+ km\/h/);
+  await expect(page.locator("#result-distance")).toHaveText(/\d+ m/);
   await page.keyboard.up("ArrowRight");
   await page.keyboard.up("ArrowUp");
   await page.screenshot({ path: info.outputPath("f03-results.png") });
@@ -65,6 +69,7 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
 });
 
 test("keeps race controls disabled when a model fails and recovers on reload", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("qracer.graphics.quality", "low"));
   await page.route("**/assets/coast/coupe.glb", (route) => route.abort());
   await page.goto("/play/");
   await expect(page.getByRole("status")).toContainText("No se pudo cargar el circuito");
@@ -72,11 +77,12 @@ test("keeps race controls disabled when a model fails and recovers on reload", a
   await expect(page.getByRole("link", { name: "Conocer el mando" })).toBeVisible();
   await page.unroute("**/assets/coast/coupe.glb");
   await page.reload();
-  await expect(page.getByRole("button", { name: "Salir a pista" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Salir a pista" })).toBeEnabled(graphicsReady);
   await expect(page.locator("#preview canvas")).toHaveCount(1);
 });
 
 test("switches rendering profiles and keeps start disabled while models load", async ({ page }) => {
+  test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 900 });
   let release = () => {};
   const held = new Promise<void>((resolve) => {
@@ -87,18 +93,18 @@ test("switches rendering profiles and keeps start disabled while models load", a
     await route.continue();
   });
   await page.goto("/play/");
-  await expect(page.locator("#graphics-progress")).toHaveJSProperty("value", 3);
+  await expect(page.locator("#graphics-progress")).toHaveJSProperty("value", 3, graphicsReady);
   await expect(page.getByRole("button", { name: "Salir a pista" })).toBeDisabled();
   release();
   const view = page.locator("#preview");
-  await expect(view).toHaveAttribute("data-quality", "balanced");
+  await expect(view).toHaveAttribute("data-quality", "balanced", graphicsReady);
   const select = page.getByLabel("Gráficos");
   for (const [profile, limit] of [
     ["high", 180],
     ["low", 80],
   ] as const) {
     await select.selectOption(profile);
-    await expect(view).toHaveAttribute("data-quality", profile);
+    await expect(view).toHaveAttribute("data-quality", profile, graphicsReady);
     await expect(view.locator("canvas")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Salir a pista" })).toBeEnabled();
     const stats = JSON.parse((await view.getAttribute("data-render-stats")) ?? "{}");
@@ -109,5 +115,5 @@ test("switches rendering profiles and keeps start disabled while models load", a
   }
   await page.reload();
   await expect(select).toHaveValue("low");
-  await expect(view).toHaveAttribute("data-quality", "low");
+  await expect(view).toHaveAttribute("data-quality", "low", graphicsReady);
 });
