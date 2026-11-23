@@ -55,6 +55,8 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
     timeout: 95000,
   });
   await expect(page.locator("#summary")).toContainText(/\d+ puntos/);
+  await expect(page.locator("#result-speed")).toHaveText(/\d+ km\/h/);
+  await expect(page.locator("#result-distance")).toHaveText(/\d+ m/);
   await page.keyboard.up("ArrowRight");
   await page.keyboard.up("ArrowUp");
   await page.screenshot({ path: info.outputPath("f03-results.png") });

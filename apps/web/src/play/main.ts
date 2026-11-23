@@ -20,14 +20,16 @@ root.innerHTML = `
     <button type="button" id="pause" hidden>Pausa <kbd>Esc</kbd></button></header>
   <main class="race-menu" id="menu">
     <section aria-labelledby="headline">
-      <p class="race-location">Circuito costero</p>
-      <h1 id="headline">Siente cada<br><em>kilómetro.</em></h1>
+      <h1 id="headline">Circuito<br><span class="race-title-accent">costero</span></h1>
     </section>
     <section class="race-controls" aria-labelledby="connect-title">
-      <h2 id="connect-title">Conduce con teclado</h2>
-      <dl><div><dt>Dirección</dt><dd><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dd></div>
-      <div><dt>Acelera / frena</dt><dd><kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
-      <div><dt>Nitro</dt><dd><kbd>Shift</kbd></dd></div></dl>
+      <h2 id="connect-title">Jugar</h2>
+      <button class="button primary" type="button" id="start-mobile" hidden disabled>Jugar con móvil</button>
+      <button type="button" id="host-pair" class="button pair-trigger" hidden>Conectar móvil</button>
+      <p id="drive-link" class="fine-print" hidden></p>
+      <button class="button primary" type="button" id="start" disabled>Salir a pista</button>
+      <p id="graphics-status" role="status">Cargando circuito…</p>
+      <progress id="graphics-progress" max="6" value="0" aria-label="Carga del circuito"></progress>
       <label class="race-quality" for="graphics-quality">Gráficos
         <select id="graphics-quality">
           <option value="low">Bajo</option>
@@ -35,24 +37,30 @@ root.innerHTML = `
           <option value="high">Alto</option>
         </select>
       </label>
-      <button class="button primary" type="button" id="start" disabled>Salir a pista</button>
-      <p id="graphics-status" role="status">Cargando circuito…</p>
-      <progress id="graphics-progress" max="6" value="0" aria-label="Carga del circuito"></progress>
-      <button type="button" id="host-pair" class="button pair-trigger" hidden>Conectar móvil</button>
-      <button class="button primary" type="button" id="start-mobile" hidden disabled>Jugar con móvil</button>
-      <p id="drive-link" class="fine-print" hidden></p>
+      <details class="race-keyboard"><summary>Controles de teclado</summary>
+        <dl><div><dt>Dirección</dt><dd><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dd></div>
+        <div><dt>Acelera / frena</dt><dd><kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
+        <div><dt>Nitro</dt><dd><kbd>Shift</kbd></dd></div></dl>
+      </details>
       <a href="/controller/">Conocer el mando</a>
     </section>
   </main>
   <section class="race-hud" id="hud" aria-label="Estado de carrera" hidden>
     <div class="race-score"><span>Puntos</span><strong id="score">0</strong><small id="distance">0 m</small></div>
-    <div class="race-dials"><span id="integrity">Integridad 3/3</span><label>Nitro <meter id="nitro" min="0" max="1" value="1"></meter></label>
-      <div class="race-speed"><strong id="speed">80</strong> km/h</div></div>
+    <label class="race-nitro">Nitro <meter id="nitro" min="0" max="1" value="1"></meter></label>
+    <div class="race-dials"><span id="integrity">Integridad 3/3</span>
+      <div class="race-speed"><strong id="speed">80</strong> <small>km/h</small></div></div>
     <small id="race-link" class="race-message race-link" hidden></small>
     <p class="race-message" id="message"></p>
   </section>
   <section class="race-overlay race-controls" id="overlay" aria-labelledby="overlay-title" hidden>
     <h2 id="overlay-title"></h2><p id="summary"></p>
+    <dl class="race-results" id="race-results" hidden>
+      <div><dt>Distancia</dt><dd id="result-distance"></dd></div>
+      <div><dt>Velocidad máxima</dt><dd id="result-speed"></dd></div>
+      <div><dt>Adelantamientos</dt><dd id="result-overtakes"></dd></div>
+      <div><dt>Casi accidentes</dt><dd id="result-near"></dd></div>
+    </dl>
     <button class="button primary" type="button" id="resume">Continuar</button>
     <button class="button" type="button" id="restart">Reiniciar</button>
     <button class="button" type="button" id="keyboard-fallback" hidden>Usar teclado</button>
@@ -192,9 +200,17 @@ function stop(finished = false, reason = "") {
   pause.hidden = true;
   hud.hidden = true;
   element("overlay-title").textContent = finished ? "Fin de carrera" : "Carrera en pausa";
+  element("race-results").hidden = !finished;
+  const result = clock.current;
   element("summary").textContent = finished
-    ? `${assisted ? "Asistida · " : ""}${clock.current.score} puntos · ${Math.floor(clock.current.driver.s)} m · Máxima ${Math.round(clock.current.topSpeed * 3.6)} km/h · ${clock.current.overtakes} adelantamientos · ${clock.current.nearMisses} casi accidentes`
+    ? `${result.score} puntos${assisted ? " · asistida" : ""}`
     : reason || "Pulsa Continuar para volver a la pista.";
+  if (finished) {
+    element("result-distance").textContent = `${Math.floor(result.driver.s)} m`;
+    element("result-speed").textContent = `${Math.round(result.topSpeed * 3.6)} km/h`;
+    element("result-overtakes").textContent = String(result.overtakes);
+    element("result-near").textContent = String(result.nearMisses);
+  }
   resume.hidden = finished;
   resume.disabled = contextLost;
   restart.disabled = contextLost;
