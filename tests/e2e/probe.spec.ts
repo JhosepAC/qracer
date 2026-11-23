@@ -107,7 +107,10 @@ test("stops input snapshots when the PC leaves so the empty room can hibernate",
   await expect(mobile.locator("#status")).toHaveText("Conectado · WSS");
   await expect.poll(() => inputs).toBeGreaterThan(2);
   await page.close();
-  await expect(mobile.locator("#status")).toHaveText("Esperando a la PC");
+  // An INPUT already in flight may reach the relay before PEER reaches the phone.
+  // Both waiting and a policy close are safe; neither may keep sending controls.
+  await expect(mobile.locator("#status")).toHaveText(/Esperando a la PC|Sesión cerrada/);
+  await expect(mobile.getByRole("button", { name: "ACELERAR" })).toBeDisabled();
   const stopped = inputs;
   await mobile.waitForTimeout(350);
   expect(inputs).toBe(stopped);
