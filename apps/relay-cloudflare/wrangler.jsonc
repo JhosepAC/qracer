@@ -7,15 +7,35 @@
   "preview_urls": false,
   "vars": { "LOCAL_DIAGNOSTICS": "false" },
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["ProbeRoom"] }
+  ],
   "env": {
     "production": {
       "vars": { "LOCAL_DIAGNOSTICS": "false" },
       "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] }
     },
     "local": {
-      "vars": { "LOCAL_DIAGNOSTICS": "true" },
-      "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] }
+      "vars": {
+        "LOCAL_DIAGNOSTICS": "true",
+        "PROBE_ORIGINS": "http://127.0.0.1:5173,http://127.0.0.1:8787"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOMS", "class_name": "Room" },
+          { "name": "PROBES", "class_name": "ProbeRoom" }
+        ]
+      }
+    },
+    "probe": {
+      "name": "qracer-f02-probe",
+      "workers_dev": true,
+      "vars": {
+        "LOCAL_DIAGNOSTICS": "false",
+        "PROBE_ORIGINS": "https://qracer-f02.pages.dev"
+      },
+      "durable_objects": { "bindings": [{ "name": "PROBES", "class_name": "ProbeRoom" }] }
     }
   }
 }

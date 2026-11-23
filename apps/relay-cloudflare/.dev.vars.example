@@ -1,2 +1,3 @@
-# No credentials are required for local emulation.
-# Add secrets only to an ignored .dev.vars file, never to frontend variables.
+# Copy to .dev.vars.local (ignored); use a fresh 32-byte lowercase hex capability.
+# Never commit it or put it in VITE_* variables.
+PROBE_KEY=replace-with-64-lowercase-hex-characters
