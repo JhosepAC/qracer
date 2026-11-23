@@ -1,0 +1,24 @@
+{
+  "source": "QRacer_F02_Car_r8",
+  "license": "MIT",
+  "units": "metres",
+  "gltfForward": "-Z",
+  "lods": {
+    "0": {
+      "triangles": 14558,
+      "materials": 8,
+      "vertices": 7459
+    },
+    "1": {
+      "triangles": 6112,
+      "materials": 8,
+      "vertices": 3236
+    }
+  },
+  "dimensionsBlender": [
+    2.5999999046325684,
+    4.6875,
+    1.4329999685287476
+  ],
+  "bytes": 2122816
+}
