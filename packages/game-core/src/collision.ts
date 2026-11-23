@@ -9,8 +9,8 @@ export function sweptClearance(
   nextS: number,
   previousD: number,
   nextD: number,
+  extent = CAR_HALF_LENGTH * 2,
 ): number {
-  const extent = CAR_HALF_LENGTH * 2;
   const speed = nextS - previousS;
   if (speed === 0 && Math.abs(previousS) > extent) return Infinity;
   const enter = speed === 0 ? 0 : (-extent - previousS) / speed;
@@ -24,8 +24,12 @@ export function sweptClearance(
   return left * right <= 0 ? 0 : Math.min(Math.abs(left), Math.abs(right));
 }
 
-export function contactFor(clearance: number, playerHalfWidth: number) {
-  const penetration = playerHalfWidth + TRAFFIC_HALF_WIDTH - clearance;
+export function contactFor(
+  clearance: number,
+  playerHalfWidth: number,
+  halfWidth = TRAFFIC_HALF_WIDTH,
+) {
+  const penetration = playerHalfWidth + halfWidth - clearance;
   if (penetration >= GRAZE_DEPTH) return "impact";
   if (penetration >= 0) return "graze";
   if (penetration >= -NEAR_MARGIN) return "near";

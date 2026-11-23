@@ -19,6 +19,7 @@ export interface TrafficRow {
   readonly s: number;
   readonly tick: number;
   readonly cars: readonly TrafficCar[];
+  readonly hazard?: "cones" | "barrier";
 }
 
 export interface Traffic {
@@ -55,18 +56,14 @@ export function trafficPattern(seed: number, row: number): readonly TrafficCar[]
 }
 
 export function trafficPosition(row: TrafficRow, tick: number): number {
-  return row.s + (tick - row.tick) * STEP_SECONDS * TRAFFIC_SPEED;
+  return row.hazard ? row.s : row.s + (tick - row.tick) * STEP_SECONDS * TRAFFIC_SPEED;
 }
 
 export function advanceTraffic(world: Traffic, seed: number, s: number, tick: number): Traffic {
   const rows = world.rows;
-  let expired = 0;
-  for (const row of rows) {
-    if (trafficPosition(row, tick) >= s - KEEP_BEHIND) break;
-    expired++;
-  }
-  if (expired === 0 && world.nextRow * ROW_SPACING > s + TRAFFIC_LOOKAHEAD) return world;
-  const retained = rows.slice(expired);
+  const onRoad = (row: TrafficRow) => trafficPosition(row, tick) >= s - KEEP_BEHIND;
+  if (world.nextRow * ROW_SPACING > s + TRAFFIC_LOOKAHEAD && rows.every(onRoad)) return world;
+  const retained = rows.filter(onRoad);
   let nextRow = world.nextRow;
   while (nextRow * ROW_SPACING <= s + TRAFFIC_LOOKAHEAD && retained.length < MAX_TRAFFIC_ROWS) {
     // After a capacity stall, never create cars within the already visible foreground.
@@ -74,7 +71,17 @@ export function advanceTraffic(world: Traffic, seed: number, s: number, tick: nu
       retained.length === 0 && nextRow === 1
         ? Math.max(s + ROW_SPACING, nextRow * ROW_SPACING)
         : s + TRAFFIC_LOOKAHEAD;
-    retained.push({ s: spawn, tick, cars: trafficPattern(seed, nextRow) });
+    const cars = trafficPattern(seed, nextRow);
+    const row = { s: spawn, tick, cars };
+    if (nextRow % 4 === 3) {
+      retained.push({
+        ...row,
+        cars: cars.slice(0, 1),
+        hazard: nextRow % 8 === 3 ? "cones" : "barrier",
+      });
+    } else {
+      retained.push(row);
+    }
     nextRow++;
   }
   return { rows: retained, nextRow };
