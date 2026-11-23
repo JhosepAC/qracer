@@ -1,7 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { bundleReport } from "../../scripts/bundle-report.ts";
 
 export default defineConfig({
+  plugins: [bundleReport()],
   build: {
     manifest: true,
     target: ["chrome111", "firefox114", "safari16.4"],
