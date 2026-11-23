@@ -1,0 +1,118 @@
+.handset[hidden] {
+  display: none;
+}
+.handset {
+  display: grid;
+  gap: 0.85rem;
+  margin-block: 1rem;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.handset-bar,
+.handset-telemetry,
+.handset-arrows {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.handset-bar p {
+  margin: 0;
+  color: #67e8db;
+}
+.handset-telemetry {
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.handset-telemetry meter {
+  width: 3.75rem;
+}
+.handset-input {
+  display: grid;
+  grid-template-columns: 1fr minmax(6rem, 1fr);
+  gap: 0.75rem;
+}
+.handset-steering,
+.handset-actions {
+  display: grid;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+.handset button {
+  min-width: 48px;
+  min-height: 52px;
+  padding: 0.5rem;
+  border: 1px solid #779098;
+  border-radius: 8px;
+  color: #f3f6f3;
+  background: #25363c;
+  font: inherit;
+  font-weight: 700;
+}
+.handset-input button {
+  touch-action: none;
+  user-select: none;
+}
+.handset button[data-held] {
+  background: #ffdf85;
+  color: #10171b;
+}
+.handset button[data-drive="throttle"] {
+  background: #ffcb47;
+  color: #10171b;
+}
+.handset button[data-drive="throttle"][data-held] {
+  background: #ffebad;
+}
+.handset-arrows button {
+  flex: 1;
+}
+.handset button.virtual-wheel {
+  display: grid;
+  place-items: center;
+  width: clamp(96px, 34vw, 160px);
+  max-width: 100%;
+  aspect-ratio: 1;
+  justify-self: center;
+  border: 0.45rem solid #6c838c;
+  border-top-color: #ffcb47;
+  border-radius: 50%;
+  background: radial-gradient(circle, #26383f 34%, #10171b 35% 62%, #344b54 63%);
+  font-size: 0.69rem;
+  letter-spacing: 0.06em;
+}
+.virtual-wheel span {
+  transform: rotate(var(--wheel-turn, 0deg));
+}
+.handset-help summary {
+  cursor: pointer;
+}
+body:has(.handset:not([hidden])) .controller-shell {
+  max-width: 52rem;
+}
+body:has(.handset:not([hidden])) #controller-title {
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  body:has(.handset:not([hidden])) .topbar {
+    padding-block: 0.4rem;
+  }
+  body:has(.handset:not([hidden])) .controller-shell {
+    padding-block: 0.4rem;
+  }
+  body:has(.handset:not([hidden])) #controller-title {
+    display: none;
+  }
+  .handset-input {
+    grid-template-columns: 1.3fr 2fr;
+  }
+  .handset-steering {
+    grid-template-columns: 1fr 1fr;
+  }
+  .handset-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .handset button.virtual-wheel {
+    width: 84px;
+    min-width: 68px;
+  }
+}

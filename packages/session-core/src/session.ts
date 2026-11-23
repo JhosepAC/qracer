@@ -21,6 +21,7 @@ export interface Peer {
   windowAt: number;
   count: number;
   total?: number;
+  driveControl?: number;
   drive?: DriveRate;
 }
 
@@ -275,16 +276,21 @@ export class RoomSession {
       peer.windowAt = received;
       peer.count = 0;
       peer.total = 0;
+      peer.driveControl = 0;
     }
     peer.total = (peer.total ?? 0) + 1;
     const message = peer.total <= 50 ? parseClient(raw) : undefined;
-    if (!message || (message.type !== "INPUT" && ++peer.count > 12))
+    if (!message || (!("epoch" in message) && ++peer.count > 8))
       return [this.reject(id, "INVALID"), ...this.remove(id, received)];
     if (!this.identified(id) && message.type !== "AUTH")
       return [this.reject(id, "AUTH_REQUIRED"), ...this.remove(id, received)];
     if (message.type === "AUTH" && message.version !== SESSION_VERSION)
       return [this.reject(id, "VERSION_MISMATCH"), ...this.remove(id, received)];
     if ("epoch" in message) {
+      if (message.type !== "INPUT") {
+        peer.driveControl = (peer.driveControl ?? 0) + 1;
+        if (peer.driveControl > 12) return [];
+      }
       const expired = this.expire(received);
       if (!this.peers.has(id)) return expired;
       return expired.concat(this.forward(peer, message, received));
