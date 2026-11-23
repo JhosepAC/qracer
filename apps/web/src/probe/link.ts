@@ -1,4 +1,7 @@
 export type Frame = Record<string, unknown>;
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) location.reload();
+});
 export type Input = { steer: number; throttle: number; brake: number; seq: number };
 export const neutral = (): Input => ({ steer: 0, throttle: 0, brake: 0, seq: 0 });
 export function validInput(value: Frame): value is Frame & Input {

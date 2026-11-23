@@ -1,6 +1,7 @@
 import qrcode from "qrcode-generator";
 import { element, exportReport, neutral, ProbeLink, relayUrl, validInput } from "./link.ts";
 import "./probe.css";
+import { RtcProbe } from "./rtc.ts";
 
 element("app").innerHTML = `
   <header><a class="brand" href="/play/">Q<span>RACER</span></a><span class="eyebrow">LAB / 02</span></header>
@@ -16,7 +17,7 @@ element("app").innerHTML = `
       <button id="new" type="submit">Crear enlace</button></form>
       <div id="qr" aria-label="Código QR de invitación"></div><p id="expiry"></p>
       <a id="invite" hidden rel="noreferrer" target="_blank">Abrir mando de prueba</a>
-      <p id="error" role="alert"></p><button id="export" class="secondary">Exportar mediciones</button>
+      <p id="error" role="alert"></p><p id="rtc-status">ICE sin probar</p><button id="export" class="secondary">Exportar mediciones</button>
       <small>Invitación de un solo uso · 2 min para conectar · sesión de 20 min. Tras desconectar, crea otro enlace.</small>
     </aside>
   </section>`;
@@ -27,6 +28,7 @@ relay.value = location.hostname.endsWith("pages.dev")
     ? "http://127.0.0.1:3000"
     : location.origin;
 let link: ProbeLink | undefined;
+let rtc: RtcProbe | undefined;
 let input = neutral();
 let receivedAt = -Infinity;
 let inviteUntil = 0;
@@ -43,6 +45,8 @@ element("create").onsubmit = async (event) => {
   event.preventDefault();
   element("error").textContent = "";
   element<HTMLButtonElement>("new").disabled = true;
+  rtc?.dispose();
+  rtc = undefined;
   if (link) {
     link.onclose = () => {};
     link.onframe = () => {};
@@ -79,6 +83,13 @@ element("create").onsubmit = async (event) => {
     pending.clear();
     startedAt = performance.now();
     link.onframe = (frame) => {
+      if (frame.type === "SIGNAL") rtc?.receive(frame);
+      if ((frame.type === "PEER" || frame.type === "READY") && link?.connected && !rtc) {
+        rtc = new RtcProbe(link, true, (message) => {
+          element("rtc-status").textContent = message;
+        });
+        void rtc.start().catch(() => rtc?.dispose());
+      }
       if (frame.type === "INPUT" && validInput(frame) && frame.seq > lastSeq) {
         if (lastSeq >= 0) gaps += frame.seq - lastSeq - 1;
         lastSeq = frame.seq;
@@ -95,11 +106,13 @@ element("create").onsubmit = async (event) => {
         }
       }
       if (frame.type === "PEER" && frame.connected !== true) {
+        rtc?.dispose();
         input = neutral();
         receivedAt = -Infinity;
       }
     };
     link.onclose = () => {
+      rtc?.dispose();
       input = neutral();
       receivedAt = -Infinity;
       element("status").textContent = "Sesión cerrada. Crea otro enlace.";
@@ -168,6 +181,7 @@ element("export").onclick = () => {
     sequenceGaps: gaps,
     stalePauses: stale,
     rttSamples: rtts.length,
+    rtc: rtc?.report ?? null,
     rttP95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? null,
     note: "RTT de aplicación PC-relay-móvil-relay-PC; huecos de secuencia no equivalen a pérdida IP.",
   });
@@ -176,4 +190,5 @@ window.addEventListener("pagehide", () => {
   clearInterval(watchdog);
   clearInterval(heartbeat);
   link?.close();
+  rtc?.dispose();
 });

@@ -36,6 +36,13 @@ test("probe authenticates two browsers, clears invitation and releases cancelled
   );
   await mobile.screenshot({ path: testInfo.outputPath("probe-controller.png"), fullPage: true });
   await expect(page.locator("#metrics")).not.toContainText("RTT —", { timeout: 4000 });
+  await expect(page.locator("#rtc-status")).toContainText(/directo|WSS continúa|no disponible/, {
+    timeout: 7000,
+  });
+  await testInfo.attach("rtc-browser-result", {
+    body: await page.locator("#rtc-status").innerText(),
+    contentType: "text/plain",
+  });
   await mobileContext.close();
   await expect(page.locator("#meter")).toHaveText("PAUSA SEGURA");
   // Host screenshot excludes the consumed invitation/QR from its evidence.
@@ -46,4 +53,35 @@ test("probe authenticates two browsers, clears invitation and releases cancelled
     node.replaceChildren();
   });
   await page.screenshot({ path: testInfo.outputPath("probe-host.png"), fullPage: true });
+});
+
+test("denied sensors and unavailable RTC preserve tactile control", async ({ page, browser }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "RTCPeerConnection", {
+      value: class {
+        constructor() {
+          throw new Error("Unsupported");
+        }
+      },
+    });
+  });
+  await page.goto("/probe/");
+  await page.getByRole("button", { name: "Crear enlace" }).click();
+  const invite = page.getByRole("link", { name: "Abrir mando de prueba" });
+  await expect(invite).toBeVisible();
+  const context = await browser.newContext();
+  await context.addInitScript(() => {
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      value: async () => "denied",
+    });
+  });
+  const mobile = await context.newPage();
+  await mobile.goto((await invite.getAttribute("href")) ?? "");
+  await mobile.getByText("Pruebas opcionales").click();
+  await mobile.getByRole("button", { name: "Activar inclinación" }).click();
+  await expect(mobile.locator("#sensor-status")).toContainText("denegado");
+  await expect(mobile.getByRole("button", { name: "ACELERAR" })).toBeEnabled();
+  await expect(page.locator("#rtc-status")).toContainText("WSS continúa");
+  await expect(page.locator("#metrics")).not.toContainText("RTT —", { timeout: 4000 });
+  await context.close();
 });
