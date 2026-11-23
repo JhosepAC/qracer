@@ -12,6 +12,7 @@ La planificación en `docs/` es local y no se publica. Cuando exista, leer [docs
 - Usar Conventional Commits en commits, títulos de PR y squash final. Seguir tipos y scopes de `docs/DEVELOPMENT.md`.
 - Mantener coste de servicios USD 0. No añadir pasos obligatorios de pago, crédito temporal, TURN contratado o generación premium.
 - Seguir las referencias y reglas de [docs/DESIGN.md](docs/DESIGN.md). No sustituir la estética arcade por un dashboard genérico ni incorporar marcas/modelos de las imágenes.
+- Los vehículos y paisajes 3D deben ser modernos, detallados y avanzados. Un ensamblaje de cubos o paisaje plano de prueba no constituye arte aceptable. Mantener siluetas trabajadas, materiales PBR, iluminación y detalle ambiental con LOD, instancing y presupuestos medidos; ver [assets-src/README.md](assets-src/README.md).
 - Producir los elementos 3D apropiados con Blender mediante MCP cuando esté disponible, según [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md). No fingir una conexión que no existe ni instalar integraciones globales ajenas al trabajo solicitado.
 - Mantener PC como autoridad de simulación, táctil/teclado como alternativas y pausa segura ante pérdida de mando.
 - Añadir pruebas de valor para lógica, seguridad y flujos cambiados; respetar presupuestos de rendimiento. No escribir tests que solo repitan una edición de documentación.

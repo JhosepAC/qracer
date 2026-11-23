@@ -45,6 +45,13 @@ blob-report/
 .wrangler/
 .codegraph/
 .agents/.cache/
+# Optional third-party authoring skills: restore using skills-lock.json, not game assets.
+/.agents/skills/threejs-performance/
+/.agents/skills/blender-core/
+/.agents/skills/blender-hardsurface-modeling/
+/.agents/skills/blender-environment-kits/
+/.agents/skills/blender-game-optimization/
+/.agents/skills/blender-asset-qa/
 .codex/
 logs/
 *.log
