@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { sweptClearance } from "./collision.ts";
 import {
+  advanceTraffic,
   createRace,
   driving,
   FixedClock,
@@ -9,6 +10,7 @@ import {
   openLane,
   type Race,
   stepRace,
+  trafficPosition,
 } from "./index.ts";
 
 it("sweeps both axes and rejects lateral overlap outside the longitudinal window", () => {
@@ -65,6 +67,38 @@ it("records a single near miss and a single clean rebase, and distinguishes a gr
   expect(graze.driver.integrity).toBe(3);
   expect(graze.overtakes).toBe(0);
   expect(graze.nearMisses).toBe(0);
+});
+
+it("keeps work zones stationary, passable and absent from overtaking rewards", () => {
+  const race = encounter(3);
+  const hazard = {
+    s: 480,
+    tick: 1000,
+    cars: [{ id: 9, d: 0, paint: 0 }],
+    hazard: "cones",
+  } as const;
+  const moving = { s: 320, tick: 0, cars: [] };
+  const previous = { nextRow: 3, rows: [moving] };
+  const generated = advanceTraffic(previous, race.seed, 224, 1000).rows[1];
+  expect(generated).toMatchObject({ hazard: "cones", s: 480 });
+  if (!generated) throw new Error("Missing work zone");
+  expect(generated.cars).toHaveLength(1);
+  expect(generated.cars[0]?.d).not.toBe(laneCenters[openLane(race.seed)]);
+  expect(trafficPosition(generated, 2000)).toBe(480);
+  expect(
+    advanceTraffic({ nextRow: 100, rows: [moving, hazard] }, race.seed, 510, 2000).rows,
+  ).toEqual(previous.rows);
+
+  let safe: Race = { ...race, traffic: { nextRow: 100, rows: [{ ...hazard, s: 8, tick: 0 }] } };
+  let hit: Race = { ...safe, driver: { ...safe.driver, d: 0 } };
+  for (let i = 0; i < 120; i++) {
+    safe = stepRace(safe, neutralInput);
+    hit = stepRace(hit, neutralInput);
+  }
+  expect(safe.driver.integrity).toBe(3);
+  expect(safe.overtakes).toBe(0);
+  expect(safe.nearMisses).toBe(0);
+  expect(hit.driver.integrity).toBe(2);
 });
 
 it("replays a full seeded race at 30/60/120 Hz and resets after suspension", () => {

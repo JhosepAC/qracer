@@ -91,14 +91,15 @@ export function stepRace(state: Race, input: DriveInput): Race {
   };
 
   for (const row of state.traffic.rows) {
+    const extent = CAR_HALF_LENGTH + (row.hazard ? 0.4 : CAR_HALF_LENGTH);
     const oldS = before.s - trafficPosition(row, state.tick);
     const newS = motion.s - trafficPosition(row, tick);
-    if (newS < -2 * CAR_HALF_LENGTH || oldS > 2 * CAR_HALF_LENGTH) continue;
+    if (newS < -extent || oldS > extent) continue;
     for (const car of row.cars) {
       const seen = state.encounters.get(car.id);
       if (seen === "passed") continue;
-      const clearance = sweptClearance(oldS, newS, before.d - car.d, motion.d - car.d);
-      const contact = contactFor(clearance, config.playerHalfWidth);
+      const clearance = sweptClearance(oldS, newS, before.d - car.d, motion.d - car.d, extent);
+      const contact = contactFor(clearance, config.playerHalfWidth, row.hazard ? 0.8 : undefined);
       if (contact === "impact" && seen !== "contact") {
         remember(car.id, "contact");
         if (integrity > 0 && tick >= protectedUntil) {
@@ -116,9 +117,9 @@ export function stepRace(state: Race, input: DriveInput): Race {
       } else if (contact === "near" && !seen) {
         remember(car.id, "near");
       }
-      if (newS > 2 * CAR_HALF_LENGTH) {
+      if (newS > extent) {
         const final = changes?.get(car.id) ?? seen;
-        if (final !== "contact" && final !== "graze") {
+        if (!row.hazard && final !== "contact" && final !== "graze") {
           overtakes++;
           emit("overtake", car.id);
           if (final === "near") {

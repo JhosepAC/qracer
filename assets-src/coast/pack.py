@@ -44,9 +44,10 @@ def main(encoder):
         for name, source in (
             ("coupe", PROBE / "coupe.glb"),
             ("coast", document),
+            ("props", ROOT / "artifacts/f06/coast-props.glb"),
         ):
             gltf("meshopt", source, stage / f"{name}.glb")
-        products = [stage / "coupe.glb", stage / "coast.glb"]
+        products = [stage / name for name in ("coupe.glb", "coast.glb", "props.glb")]
         report = {}
         for model in products:
             content = model.read_bytes()
