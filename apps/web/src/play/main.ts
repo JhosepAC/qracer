@@ -173,11 +173,19 @@ function run(reset: boolean) {
 async function mount() {
   const attempt = new AbortController();
   loading = attempt;
+  let timedOut = false;
+  const deadline = window.setTimeout(() => {
+    timedOut = true;
+    attempt.abort();
+  }, 15000);
   try {
     const { createRaceView } = await import("./race-view.ts");
     attempt.signal.throwIfAborted();
     const scene = await createRaceView(preview, attempt.signal);
-    if (attempt.signal.aborted) return scene.dispose();
+    if (attempt.signal.aborted) {
+      scene.dispose();
+      attempt.signal.throwIfAborted();
+    }
     view = scene;
     contextLost = false;
     scene.canvas.addEventListener("webglcontextlost", (event) => {
@@ -199,10 +207,14 @@ async function mount() {
     start.disabled = resume.disabled = restart.disabled = false;
     status.textContent = "";
   } catch {
-    if (attempt.signal.aborted) return;
+    if (loading !== attempt || (attempt.signal.aborted && !timedOut)) return;
     view?.dispose();
     view = undefined;
-    status.textContent = "Activa WebGL 2 y recarga para abrir el circuito.";
+    status.textContent = timedOut
+      ? "El circuito tardó demasiado en cargar. Recarga para reintentar."
+      : "Activa WebGL 2 y recarga para abrir el circuito.";
+  } finally {
+    window.clearTimeout(deadline);
   }
 }
 
@@ -230,6 +242,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!clock.paused) stop();
   loading?.abort();
+  loading = undefined;
   view?.dispose();
   view = undefined;
   delete preview.dataset.graphics;

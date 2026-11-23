@@ -121,7 +121,7 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     const loader = new GLTFLoader();
     async function load(name: string) {
       const response = await fetch(`/assets/probe/${name}.glb`, {
-        signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+        signal,
       });
       if (!response.ok) throw new Error("No se pudo cargar el circuito.");
       const glb = await response.arrayBuffer();
