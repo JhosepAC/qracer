@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@qracer/game-core": "workspace:*",
     "@qracer/protocol": "workspace:*",
     "qrcode-generator": "2.0.4",
     "three": "0.187.0"

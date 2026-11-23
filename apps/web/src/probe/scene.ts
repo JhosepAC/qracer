@@ -23,7 +23,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { assetRoot, materialParts } from "./batching.ts";
+import { assetRoot, materialParts } from "../graphics/batching.ts";
 import { gpuTimer, Histogram } from "./render-metrics.ts";
 import type { Input } from "./link.ts";
 import { expiredInput } from "./freshness.ts";
