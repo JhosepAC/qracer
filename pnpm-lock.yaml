@@ -230,6 +230,12 @@ importers:
         specifier: 0.187.0
         version: 0.187.0
 
+  packages/probe:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/protocol:
     dependencies:
       zod:
