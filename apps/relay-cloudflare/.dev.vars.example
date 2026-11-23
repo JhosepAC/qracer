@@ -1,0 +1,2 @@
+# No credentials are required for local emulation.
+# Add secrets only to an ignored .dev.vars file, never to frontend variables.
