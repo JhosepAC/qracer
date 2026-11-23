@@ -31,12 +31,21 @@ root.innerHTML = `
 
 const preview = document.querySelector<HTMLElement>("#preview");
 const status = document.querySelector<HTMLElement>("#graphics-status");
-if (preview && status) {
+let disposePreview: (() => void) | undefined;
+function mountPreview() {
+  if (!preview || !status) return;
   try {
-    const dispose = createPreview(preview);
+    disposePreview = createPreview(preview);
     status.textContent = "Vista previa del garaje · WebGL 2";
-    window.addEventListener("pagehide", dispose, { once: true });
   } catch {
     status.textContent = "Activa WebGL 2 para ver el garaje en este navegador.";
   }
 }
+mountPreview();
+window.addEventListener("pagehide", () => {
+  disposePreview?.();
+  disposePreview = undefined;
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) mountPreview();
+});
