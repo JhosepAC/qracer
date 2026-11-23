@@ -68,7 +68,7 @@ it("records a single near miss and a single clean rebase, and distinguishes a gr
 
 it("replays a full seeded race at 30/60/120 Hz and resets after suspension", () => {
   const seed = 310;
-  const d = laneCenters[openLane(seed)]!;
+  const d = laneCenters[openLane(seed)] ?? 0;
   function replay(hz: number) {
     const events: unknown[] = [];
     const clock = new FixedClock(createRace(seed), (before) => {

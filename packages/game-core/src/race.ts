@@ -71,10 +71,12 @@ export function stepRace(state: Race, input: DriveInput): Race {
   let changes: Map<number, Encounter> | undefined;
   let events: RaceEvent[] | undefined;
   const remember = (id: number, value: Encounter) => {
-    (changes ??= new Map(state.encounters)).set(id, value);
+    changes ??= new Map(state.encounters);
+    changes.set(id, value);
   };
   const emit = (type: RaceEvent["type"], car: number) => {
-    (events ??= []).push({ type, car });
+    events ??= [];
+    events.push({ type, car });
   };
 
   for (const row of state.traffic.rows) {
@@ -88,7 +90,7 @@ export function stepRace(state: Race, input: DriveInput): Race {
       const contact = contactFor(clearance, driving.playerHalfWidth);
       if (contact === "impact" && seen !== "contact") {
         remember(car.id, "contact");
-        if (tick > protectedUntil) {
+        if (integrity > 0 && tick >= protectedUntil) {
           integrity--;
           protectedUntil = tick + PROTECTION;
           speed = Math.max(driving.minimum, speed * 0.62);
