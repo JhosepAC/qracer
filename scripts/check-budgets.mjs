@@ -13,6 +13,7 @@ export function reachableFiles(manifest, entry) {
     if (!chunk) throw new Error(`Missing build entry: ${key}`);
     files.add(chunk.file);
     for (const css of chunk.css ?? []) files.add(css);
+    for (const asset of chunk.assets ?? []) files.add(asset);
     for (const ref of [...(chunk.imports ?? []), ...(chunk.dynamicImports ?? [])]) visit(ref);
   };
   visit(entry);
@@ -42,8 +43,14 @@ export async function checkBudgets(directory) {
     ["probe/controller/index.html", 120 * 1024],
   ]) {
     let compressed = 0;
-    for (const file of reachableFiles(manifest, entry)) {
-      compressed += gzipSync(await readFile(join(directory, file))).byteLength;
+    const files = reachableFiles(manifest, entry);
+    for (const file of files) {
+      const source = await readFile(join(directory, file));
+      compressed += gzipSync(source).byteLength;
+      if (file.endsWith(".css"))
+        for (const [url] of source.toString().matchAll(/assets\/fonts\/[\w-]+\.woff2/g)) {
+          files.add(url);
+        }
       if (entry.includes("controller") && report[file]?.modules.some(forbiddenControllerModule)) {
         throw new Error(`Renderer code leaked into the controller: ${file}`);
       }
