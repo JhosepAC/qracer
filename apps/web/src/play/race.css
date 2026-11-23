@@ -91,6 +91,26 @@
 .race-controls .primary {
   width: 100%;
 }
+.race-quality {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-block: 1rem;
+}
+.race-quality select {
+  min-height: 44px;
+  padding-inline: 0.6rem;
+  color: inherit;
+  background: #10171b;
+  border: 1px solid #657b83;
+  border-radius: 4px;
+  font: inherit;
+}
+#graphics-progress {
+  width: 100%;
+  accent-color: #67e8db;
+}
 #graphics-status:empty,
 .race-message:empty {
   display: none;
