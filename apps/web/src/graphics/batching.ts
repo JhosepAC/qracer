@@ -1,4 +1,11 @@
-import { type BufferGeometry, type Material, Matrix4, Mesh, type Object3D } from "three";
+import {
+  BufferAttribute,
+  type BufferGeometry,
+  type Material,
+  Matrix4,
+  Mesh,
+  type Object3D,
+} from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 /** Asset roots have stable metadata; exported node names are intentionally irrelevant. */
@@ -18,9 +25,19 @@ export function materialParts(root: Object3D): { geometry: BufferGeometry; mater
   root.traverse((node) => {
     if (!(node instanceof Mesh)) return;
     if (Array.isArray(node.material)) throw new Error("Expected glTF material primitives");
-    const geometry = node.geometry
-      .clone()
-      .applyMatrix4(new Matrix4().multiplyMatrices(inverse, node.matrixWorld));
+    const geometry = node.geometry.clone();
+    // Meshopt can store normalized integers and put the decode transform on the
+    // node. Baking that transform into another integer attribute clips positions.
+    for (const name of ["position", "normal", "tangent"]) {
+      const source = geometry.getAttribute(name);
+      if (!source || source.array instanceof Float32Array) continue;
+      const values = new Float32Array(source.count * source.itemSize);
+      for (let i = 0; i < source.count; i++)
+        for (let component = 0; component < source.itemSize; component++)
+          values[i * source.itemSize + component] = source.getComponent(i, component);
+      geometry.setAttribute(name, new BufferAttribute(values, source.itemSize));
+    }
+    geometry.applyMatrix4(new Matrix4().multiplyMatrices(inverse, node.matrixWorld));
     const group = groups.get(node.material) ?? [];
     group.push(geometry);
     groups.set(node.material, group);

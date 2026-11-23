@@ -410,11 +410,11 @@ export async function createRaceView(
       const reduced = reducedMotion.matches;
       const pace = p.speed + (c.speed - p.speed) * alpha;
       const fast = reduced ? 0 : Math.max(0, pace - 18) / 35;
-      roadPose(distance - 8.4 - fast * 0.85, lateral * 0.64, origin, pose);
-      camera.position.set(pose.x, 3.55 + fast * 0.24, pose.z);
+      roadPose(distance - 7.1 - fast * 0.72, lateral * 0.69, origin, pose);
+      camera.position.set(pose.x, 3.12 + fast * 0.21, pose.z);
       roadPose(distance + 22, lateral * 0.2, origin, pose);
       camera.lookAt(pose.x, 0.41, pose.z);
-      const fov = 52 + fast * 3.5;
+      const fov = 49 + fast * 3.8;
       if (Math.abs(camera.fov - fov) >= 0.08) {
         camera.fov = fov;
         camera.updateProjectionMatrix();
