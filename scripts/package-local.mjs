@@ -35,7 +35,16 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void re
 );
 await writeFile(
   join(stage, "README.txt"),
-  "QRacer local bootstrap\nRequires Node 24.21.0 (no pnpm, Blender or node_modules).\nRun: node start.mjs\nOpen http://127.0.0.1:3000/play/\nPairing/gameplay arrive in later phases.\nFor trusted LAN use QRACER_HOST and QRACER_ALLOWED_ORIGINS explicitly. Sensors require trusted HTTPS.\n",
+  [
+    "QRacer local",
+    "Requires Node 24.21.0 (no pnpm, Blender or node_modules).",
+    "Run: node start.mjs",
+    "Open http://127.0.0.1:3000/play/ and choose Salir a pista.",
+    "Steer: A/D or Left/Right. Throttle/brake: W/S or Up/Down. Boost: Shift. Pause: Esc.",
+    "Phone experiments: /probe/.",
+    "For trusted LAN use QRACER_HOST and QRACER_ALLOWED_ORIGINS explicitly. Sensors require trusted HTTPS.",
+    "",
+  ].join("\n"),
 );
 const archive = join(output, "qracer-local-0.1.0.tar.gz");
 execFileSync("tar", ["-czf", archive, "-C", stage, "."], { windowsHide: true });
