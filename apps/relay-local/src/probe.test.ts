@@ -4,6 +4,8 @@ import type { Credentials } from "@qracer/probe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { createRelay } from "./server.ts";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createProbe } from "./probe.ts";
 
 describe("F02 local probe", () => {
   const origin = "http://trusted.local";
@@ -70,4 +72,34 @@ describe("F02 local probe", () => {
     });
     expect(String((await once(unknown, "error"))[0])).toContain("403");
   });
+});
+
+it("permits the PC using its own LAN address and rejects another LAN caller without a key", async () => {
+  const probe = createProbe(new Set(["http://trusted.local"]));
+  try {
+    for (const [remote, local, expected] of [
+      ["192.168.1.10", "192.168.1.10", 201],
+      ["192.168.1.11", "192.168.1.10", 403],
+      [undefined, undefined, 403],
+    ] as const) {
+      let status = 0;
+      const response = {
+        setHeader() {},
+        writeHead(code: number) {
+          status = code;
+          return { end() {} };
+        },
+      } as unknown as ServerResponse;
+      const request = {
+        url: "/probe/session",
+        method: "POST",
+        headers: { origin: "http://trusted.local" },
+        socket: { remoteAddress: remote, localAddress: local },
+      } as IncomingMessage;
+      expect(probe.request(request, response)).toBe(true);
+      expect(status).toBe(expected);
+    }
+  } finally {
+    await probe.close();
+  }
 });

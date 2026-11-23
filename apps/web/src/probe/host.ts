@@ -3,6 +3,7 @@ import { element, exportReport, neutral, ProbeLink, relayUrl, validInput } from 
 import "./probe.css";
 import { RtcProbe } from "./rtc.ts";
 import type { createStress, Profile } from "./scene.ts";
+import { expiredInput } from "./freshness.ts";
 
 element("app").innerHTML = `
   <header><a class="brand" href="/play/">Q<span>RACER</span></a><span class="eyebrow">LAB / 02</span></header>
@@ -74,6 +75,7 @@ element("viewport").addEventListener("probe-report", () => {
 let input = neutral();
 let receivedAt = -Infinity;
 let inviteUntil = 0;
+let joined = false;
 let startedAt = 0;
 let lastSeq = -1;
 let gaps = 0;
@@ -99,6 +101,7 @@ element("create").onsubmit = async (event) => {
   element<HTMLAnchorElement>("invite").hidden = true;
   input = neutral();
   inviteUntil = 0;
+  joined = false;
   receivedAt = -Infinity;
   try {
     const base = relayUrl(relay.value);
@@ -125,6 +128,14 @@ element("create").onsubmit = async (event) => {
     pending.clear();
     startedAt = performance.now();
     link.onframe = (frame) => {
+      if (link?.connected && !joined) {
+        joined = true;
+        inviteUntil = 0;
+        element("qr").replaceChildren();
+        const invitation = element<HTMLAnchorElement>("invite");
+        invitation.hidden = true;
+        invitation.removeAttribute("href");
+      }
       if (frame.type === "SIGNAL") rtc?.receive(frame);
       if ((frame.type === "PEER" || frame.type === "READY") && link?.connected && !rtc) {
         rtc = new RtcProbe(link, true, (message) => {
@@ -182,13 +193,14 @@ element("create").onsubmit = async (event) => {
 };
 let hudTick = 0;
 const watchdog = setInterval(() => {
-  const age = performance.now() - receivedAt;
-  const paused = !link?.connected || age >= 225 || document.hidden;
+  const now = performance.now();
+  const age = now - receivedAt;
+  const paused = !link?.connected || expiredInput(receivedAt, now) || document.hidden;
   if (paused && !wasStale && frames) stale++;
   wasStale = paused;
   const safe = paused || age >= 150 ? neutral() : input;
   element("viewport").dispatchEvent(
-    new CustomEvent("probe-input", { detail: { ...safe, paused } }),
+    new CustomEvent("probe-input", { detail: { ...safe, paused, receivedAt } }),
   );
   if (++hudTick % 4 !== 0) return;
   element("meter").textContent = paused
@@ -201,7 +213,13 @@ const watchdog = setInterval(() => {
       ? "Mando enlazado · esperando entrada"
       : "Mando activo / WSS";
     element("qr").hidden = true;
-  } else element("qr").hidden = false;
+  } else {
+    element("qr").hidden = joined || (inviteUntil > 0 && Date.now() >= inviteUntil);
+    if (link?.ready && joined)
+      element("status").textContent = "Mando desconectado. Crea otro enlace.";
+    else if (link?.ready && inviteUntil && Date.now() >= inviteUntil)
+      element("status").textContent = "Invitación caducada. Crea otro enlace.";
+  }
   element("expiry").textContent = inviteUntil
     ? `Invitación: ${Math.max(0, Math.ceil((inviteUntil - Date.now()) / 1000))} s`
     : "";

@@ -26,6 +26,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { assetRoot, materialParts } from "./batching.ts";
 import { gpuTimer, Histogram } from "./render-metrics.ts";
 import type { Input } from "./link.ts";
+import { expiredInput } from "./freshness.ts";
 
 export type Profile = "low" | "balanced" | "high";
 export const profiles = {
@@ -97,12 +98,13 @@ export async function createStress(
   }
   const frames = new Histogram(),
     cpu = new Histogram();
-  let input: Input & { paused: boolean } = {
+  let input: Input & { paused: boolean; receivedAt: number } = {
     steer: 0,
     throttle: 0,
     brake: 0,
     seq: 0,
     paused: true,
+    receivedAt: -Infinity,
   };
   let frame = 0,
     disposed = false,
@@ -229,7 +231,7 @@ export async function createStress(
   observer.observe(container);
   resize();
   const receive = (event: Event) => {
-    input = (event as CustomEvent<Input & { paused: boolean }>).detail;
+    input = (event as CustomEvent<Input & { paused: boolean; receivedAt: number }>).detail;
   };
   container.addEventListener("probe-input", receive);
   renderer.domElement.addEventListener("webglcontextlost", (event) => {
@@ -374,7 +376,7 @@ export async function createStress(
       const measuring = activeMs >= 30000;
       if (measuring) frames.add(now - previous);
       previous = now;
-      const paused = !auto && input.paused;
+      const paused = !auto && (input.paused || expiredInput(input.receivedAt, now));
       const steer = auto ? Math.sin(travel * 0.012) * 0.1 : input.steer;
       const throttle = auto ? 1 : input.throttle;
       speed = paused

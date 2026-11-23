@@ -46,6 +46,7 @@ function update() {
   input.throttle = held.has("throttle") && !input.brake ? 1 : 0;
 }
 function send(force = false) {
+  if (!link?.connected) return;
   update();
   if (force || !document.hidden) link?.send({ type: "INPUT", ...input, seq: ++seq });
 }
