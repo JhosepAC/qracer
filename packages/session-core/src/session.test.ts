@@ -139,7 +139,12 @@ it("restores attachments, expires unauthenticated peers and terminates a departe
 it("rejects version mismatch, bounds invitations and expires an unpaired room", async () => {
   const s = await fixture();
   expect(
-    await s.send(s.open(), { type: "AUTH", version: 2, role: "host", token: s.creation.hostToken }),
+    await s.send(s.open(), {
+      type: "AUTH",
+      version: SESSION_VERSION + 1,
+      role: "host",
+      token: s.creation.hostToken,
+    }),
   ).toMatchObject([{ frame: { code: "VERSION_MISMATCH" }, close: true }]);
   const invite = await s.rotate();
   s.jump(INVITE_MS - 1);
@@ -147,5 +152,36 @@ it("rejects version mismatch, bounds invitations and expires an unpaired room", 
   s.jump(1);
   expect(s.room.expire(s.now())).toMatchObject([
     { id: s.host, frame: { code: "ROOM_EXPIRED" }, close: true },
+  ]);
+});
+
+it("fences input by role, epoch and sequence, and caps bursts", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  const frame = {
+    type: "INPUT",
+    epoch: 1,
+    seq: 1,
+    captured: 200,
+    input: { steer: 0.5, throttle: 1, brake: 0, boost: false, assist: false },
+  } as const;
+  expect(await s.send(phone, frame)).toEqual([]);
+  await s.link(phone);
+  expect(await s.send(s.host, frame)).toEqual([]);
+  expect(await s.send(phone, { ...frame, epoch: 0 })).toEqual([]);
+  expect(await s.send(phone, frame)).toEqual([{ id: s.host, frame }]);
+  expect(await s.send(phone, frame)).toEqual([]);
+  expect(await s.send(phone, { ...frame, seq: 2 })).toHaveLength(1);
+  expect(await s.send(phone, { ...frame, seq: 3 })).toEqual([]);
+  s.jump(34);
+  expect(await s.send(phone, { ...frame, seq: 3 })).toHaveLength(1);
+  expect(await s.send(phone, { type: "DRIVE_PAUSE", epoch: 1, seq: 4 })).toHaveLength(1);
+  expect(await s.send(phone, { type: "DRIVE_PAUSE", epoch: 1, seq: 4 })).toEqual([]);
+  expect(
+    await s.send(phone, { ...frame, seq: 5, input: { ...frame.input, steer: 2 } }),
+  ).toMatchObject([
+    { frame: { type: "ERROR", code: "INVALID" } },
+    { frame: { phase: "reconnecting" } },
   ]);
 });
