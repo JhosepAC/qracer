@@ -42,6 +42,26 @@ describe("local bootstrap relay", () => {
     expect(code).toBe(1008);
   });
 
+  it("bounds websocket messages before JSON parsing", async () => {
+    const peer = new WebSocket(`${url.replace("http", "ws")}/ws`, {
+      origin: "http://trusted.local",
+    });
+    await once(peer, "open");
+    peer.send(" ".repeat(1025));
+    const [code] = await once(peer, "close");
+    expect(code).toBe(1009);
+  });
+
+  it("rejects binary input instead of interpreting it as a control message", async () => {
+    const peer = new WebSocket(`${url.replace("http", "ws")}/ws`, {
+      origin: "http://trusted.local",
+    });
+    await once(peer, "open");
+    peer.send(Buffer.from('{"type":"HELLO","version":1,"role":"host"}'));
+    const [code] = await once(peer, "close");
+    expect(code).toBe(1008);
+  });
+
   it("accepts a supported handshake then returns the ping ID", async () => {
     const peer = new WebSocket(`${url.replace("http", "ws")}/ws`, {
       origin: "http://trusted.local",
