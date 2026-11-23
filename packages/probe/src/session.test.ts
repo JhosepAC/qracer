@@ -9,6 +9,30 @@ function setup() {
   return { room, record };
 }
 describe("F02 session boundary", () => {
+  it("forwards echo only to the authenticated peer and rejects a duplicate host", () => {
+    const { room, record } = setup();
+    room.handle("pc", { type: "AUTH", role: "host", token: record.hostToken }, 1001);
+    room.handle(
+      "mobile",
+      { type: "AUTH", role: "controller", token: record.controllerToken },
+      1001,
+    );
+    room.add("other", 1002);
+    expect(
+      room.handle("other", { type: "AUTH", role: "host", token: record.hostToken }, 1003).close,
+    ).toBeDefined();
+    expect(room.handle("pc", { type: "ECHO", id: 1, reply: false }, 1004).send).toEqual([
+      { to: "mobile", body: { type: "ECHO", id: 1, reply: false } },
+    ]);
+    const restored = new ProbeSession(room.snapshot());
+    expect(
+      restored.handle(
+        "mobile",
+        { type: "INPUT", seq: 1, steer: 0, throttle: 1, brake: 0 },
+        record.expiresAt,
+      ).close,
+    ).toBeDefined();
+  });
   it("requires independent role credentials before forwarding input", () => {
     const { room, record } = setup();
     expect(
