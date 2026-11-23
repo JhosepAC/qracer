@@ -46,6 +46,28 @@ export async function smokeProbeWorker(base) {
       JSON.stringify({ type: "INPUT", seq: 1, steer: 0.7, throttle: 1, brake: 0 }),
     );
     await until(() => host.messages.some((v) => v.type === "INPUT" && v.steer === 0.7));
+    host.peer.send(JSON.stringify({ type: "STATS" }));
+    await until(() => host.messages.some((v) => v.type === "STATS"));
+    assert.equal(typeof host.messages.find((v) => v.type === "STATS").bootId, "string");
+    await new Promise((done) => setTimeout(done, 12000));
+    controller.peer.send(
+      JSON.stringify({ type: "INPUT", seq: 1, steer: 0.7, throttle: 1, brake: 0 }),
+    );
+    controller.peer.send(
+      JSON.stringify({ type: "INPUT", seq: 2, steer: -0.7, throttle: 0, brake: 1 }),
+    );
+    await until(() => host.messages.some((v) => v.type === "INPUT" && v.seq === 2));
+    assert.equal(
+      host.messages.filter((v) => v.type === "INPUT").length,
+      2,
+      "Old sequence must remain rejected after idle",
+    );
+    host.peer.send(JSON.stringify({ type: "STATS" }));
+    await until(() => host.messages.filter((v) => v.type === "STATS").length === 2);
+    const boots = host.messages.filter((v) => v.type === "STATS").map((v) => v.bootId);
+    console.log(
+      `Worker idle socket/sequence restoration passed; constructor changed: ${boots[0] !== boots[1]} (emulated).`,
+    );
     controller.peer.close();
     await once(controller.peer, "close");
     await until(() => host.messages.some((v) => v.type === "PEER" && !v.connected));
@@ -56,7 +78,7 @@ export async function smokeProbeWorker(base) {
     for (let i = 1; i < 8; i++) assert.equal((await create()).status, 201);
     assert.equal((await create()).status, 429);
     console.log(
-      "Worker probe passed: SQLite, WSS adapter, role credentials, one-use invitation, size/admission limits (emulated).",
+      "Worker probe passed: SQLite, WebSocket adapter, role credentials, one-use invitation, size/admission limits (emulated).",
     );
   } finally {
     for (const peer of open) peer.terminate();

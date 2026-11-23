@@ -124,7 +124,12 @@ function connect(role) {
         last = message.seq;
       }
       if (message.type === "STATS")
-        stats.push({ phase, received: message.received, at: new Date().toISOString() });
+        stats.push({
+          phase,
+          received: message.received,
+          bootId: typeof message.bootId === "string" ? message.bootId : null,
+          at: new Date().toISOString(),
+        });
       if (message.type === "ECHO" && !message.reply && role === "controller")
         send(peer, { ...message, reply: true });
       if (message.type === "ECHO" && message.reply && role === "host") {
@@ -146,6 +151,7 @@ const result = {
   idleTargetSeconds: 120,
 };
 async function save() {
+  const boots = stats.map((value) => value.bootId).filter(Boolean);
   const sorted = [...rtts].sort((a, b) => a - b);
   Object.assign(result, {
     endedUtc: new Date().toISOString(),
@@ -161,6 +167,7 @@ async function save() {
     rttP50Ms: sorted[Math.max(0, Math.ceil(sorted.length * 0.5) - 1)] ?? null,
     rttP95Ms: sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)] ?? null,
     billing: "Application counters are not measured provider request units or GB-s",
+    constructorRestarted: boots.length >= 2 ? boots[0] !== boots.at(-1) : null,
   });
   await writeFile(resolve(output, "report.json"), `${JSON.stringify(result, null, 2)}\n`);
 }
