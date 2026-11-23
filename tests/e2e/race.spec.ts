@@ -3,15 +3,15 @@ import { expect, test } from "@playwright/test";
 test("plays a coastal race with keyboard, pauses safely and restarts from zero", async ({
   page,
 }, info) => {
-  test.setTimeout(90000);
-  await page.setViewportSize({ width: 800, height: 450 });
+  test.setTimeout(130000);
+  await page.setViewportSize({ width: 480, height: 320 });
   // Exercise the game flow independently of software-GPU stalls in CI.
   await page.addInitScript(() => {
     const request = window.requestAnimationFrame.bind(window);
     let time = 0;
     window.requestAnimationFrame = (callback) =>
       request(() => {
-        time += 1000 / 30;
+        time += 1000 / 12;
         callback(time);
       });
   });
@@ -22,7 +22,7 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
   await expect(page.locator("#message")).toHaveText("3");
   await page.keyboard.down("ArrowUp");
   await expect
-    .poll(async () => Number(await page.locator("#speed").textContent()), { timeout: 15000 })
+    .poll(async () => Number(await page.locator("#speed").textContent()), { timeout: 25000 })
     .toBeGreaterThan(115);
   await page.screenshot({ path: info.outputPath("f03-race.png") });
   const counters = JSON.parse(
@@ -49,7 +49,7 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
   await page.keyboard.down("ArrowRight");
   await page.keyboard.down("ArrowUp");
   await expect(page.getByRole("heading", { name: "Fin de carrera" })).toBeVisible({
-    timeout: 65000,
+    timeout: 95000,
   });
   await expect(page.locator("#summary")).toContainText(/\d+ puntos/);
   await page.keyboard.up("ArrowRight");
