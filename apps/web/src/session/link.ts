@@ -193,13 +193,13 @@ export class SessionLink {
   }
 
   private connect() {
-    let address: string;
+    let socket: WebSocket;
     try {
-      address = relayOrigin();
+      const address = relayOrigin().replace(/^http/, "ws");
+      socket = new WebSocket(`${address}/session/ws/${this.key.room}`);
     } catch {
-      return this.finish("El origen del relay es inválido.");
+      return this.finish("No se pudo abrir el enlace con el relay.");
     }
-    const socket = new WebSocket(`${address.replace(/^http/, "ws")}/session/ws/${this.key.room}`);
     this.socket = socket;
     this.authTimer = window.setTimeout(() => socket.close(), AUTH_MS + 1000);
     socket.onopen = () => {
