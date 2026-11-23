@@ -83,7 +83,7 @@ test("shows quota and version errors and keeps the keyboard route available", as
   await panel.getByRole("button", { name: "Generar invitación" }).click();
   await expect(panel.locator("#host-pair-status")).toContainText("Cuota de vinculación agotada");
   await page.unroute("**/session");
-  await page.route("**/session", (route) => route.fulfill({ status: 201, json: { version: 2 } }));
+  await page.route("**/session", (route) => route.fulfill({ status: 201, json: { version: 3 } }));
   await panel.getByRole("button", { name: "Generar invitación" }).click();
   await expect(panel.locator("#host-pair-status")).toContainText("Versión incompatible");
   await panel.getByRole("button", { name: "Cerrar panel" }).click();

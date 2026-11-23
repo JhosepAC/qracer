@@ -1,4 +1,7 @@
-export const SESSION_VERSION = 1;
+import { type DriveFrame, parseDriveFrame } from "./drive.ts";
+export * from "./drive.ts";
+
+export const SESSION_VERSION = 2;
 export const SESSION_BYTES = 1024;
 export const ROOM_ID = /^[0-9a-f]{32}$/;
 export const TOKEN = /^[0-9a-f]{64}$/;
@@ -29,11 +32,13 @@ export interface Creation {
 }
 
 export type ClientFrame =
+  | DriveFrame
   | { type: "AUTH"; version: number; role: Role; token: string }
   | { type: "ROTATE" | "REVOKE" | "END" }
   | { type: "APPROVE" | "REJECT"; request: string };
 
 export type ServerFrame =
+  | DriveFrame
   | {
       type: "STATE";
       phase: Phase;
@@ -79,5 +84,7 @@ export function parseClient(raw: string): ClientFrame | undefined {
     case "REVOKE":
     case "END":
       return { type };
+    default:
+      return parseDriveFrame(msg);
   }
 }

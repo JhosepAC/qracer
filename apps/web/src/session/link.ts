@@ -4,6 +4,7 @@ import {
   type ClientFrame,
   type Creation,
   type ErrorCode,
+  parseDriveFrame,
   type Phase,
   RECONNECT_MS,
   ROOM_ID,
@@ -107,6 +108,9 @@ function parseServer(raw: string): ServerFrame | undefined {
     case "ERROR":
       if (typeof data.code === "string" && Object.hasOwn(errors, data.code))
         return { type: "ERROR", code: data.code as ErrorCode };
+      return;
+    default:
+      return parseDriveFrame(data);
   }
 }
 

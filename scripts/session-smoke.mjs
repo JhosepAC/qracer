@@ -43,7 +43,7 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
       },
     };
   }
-  const auth = (peer, role, token, version = 1) =>
+  const auth = (peer, role, token, version = 2) =>
     peer.send({ type: "AUTH", role, token, version });
   const state = (peer, phase, epoch) =>
     peer.next("STATE", (f) => f.phase === phase && (epoch === undefined || f.epoch === epoch));
@@ -57,7 +57,7 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
     assert.equal(response.status, 201);
     assert.equal(response.headers.get("cache-control"), "no-store");
     const { room, hostToken, version } = await response.json();
-    assert.equal(version, 1);
+    assert.equal(version, 2);
     assert.match(room, /^[a-f0-9]{32}$/);
     await assert.rejects(() => connect(room, "https://unlisted.invalid"));
     const stranger = await connect(room);
@@ -65,7 +65,7 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
     assert.equal((await stranger.next("ERROR")).code, "UNAUTHORIZED");
     await stranger.close();
     const stale = await connect(room);
-    auth(stale, "host", hostToken, 2);
+    auth(stale, "host", hostToken, 1);
     assert.equal((await stale.next("ERROR")).code, "VERSION_MISMATCH");
     await stale.close();
 
@@ -85,6 +85,14 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
     pc.send({ type: "APPROVE", request: pending.request });
     const resume = await phone.next("RESUME");
     const linked = await state(pc, "connected", 1);
+    phone.send({
+      type: "INPUT",
+      epoch: 1,
+      seq: 1,
+      captured: 20,
+      input: { steer: 0.4, throttle: 1, brake: 0, boost: false, assist: false },
+    });
+    assert.equal((await pc.next("INPUT")).input.steer, 0.4);
     await state(phone, "connected", 1);
     if (idleMs) await sleep(idleMs);
     await phone.close();
