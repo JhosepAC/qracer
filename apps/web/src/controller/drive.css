@@ -116,3 +116,48 @@ body:has(.handset:not([hidden])) #controller-title {
     min-width: 68px;
   }
 }
+.handset[data-side="left"] .handset-actions {
+  grid-column: 1;
+  grid-row: 1;
+}
+.handset[data-side="left"] .handset-steering {
+  grid-column: 2;
+  grid-row: 1;
+}
+.handset-options summary {
+  cursor: pointer;
+}
+.handset-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  align-items: center;
+}
+.handset-options-grid p,
+.handset-options-grid label:has(input),
+#drive-diagnostic {
+  grid-column: 1 / -1;
+}
+.handset-options-grid p {
+  margin: 0;
+}
+.handset-options-grid select,
+.handset-options-grid input[type="range"] {
+  width: 100%;
+  min-height: 44px;
+}
+.handset-options-grid input {
+  accent-color: #ffcb47;
+}
+.mobile-feedback {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  color: #10171b;
+  background: #ffcb47;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.mobile-feedback[hidden] {
+  display: none;
+}
