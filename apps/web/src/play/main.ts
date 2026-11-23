@@ -139,7 +139,7 @@ function stop(finished = false) {
   hud.hidden = true;
   element("overlay-title").textContent = finished ? "Fin de carrera" : "Carrera en pausa";
   element("summary").textContent = finished
-    ? `${clock.current.score} puntos · ${Math.floor(clock.current.driver.s)} m · Máxima ${Math.round(clock.current.topSpeed * 3.6)} km/h`
+    ? `${clock.current.score} puntos · ${Math.floor(clock.current.driver.s)} m · Máxima ${Math.round(clock.current.topSpeed * 3.6)} km/h · ${clock.current.overtakes} adelantamientos · ${clock.current.nearMisses} casi accidentes`
     : "Pulsa Continuar para volver a la pista.";
   resume.hidden = finished;
   resume.disabled = contextLost;
@@ -223,6 +223,7 @@ pause.onclick = () => stop();
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.altKey || event.metaKey || clock.paused) return;
   if (event.code === "Escape") {
+    event.preventDefault();
     if (!event.repeat) stop();
   } else if (controls.includes(event.code)) {
     event.preventDefault();
