@@ -18,9 +18,12 @@ export function assetRoot(scene: Object3D, property: string, value: string | num
   return found;
 }
 
-export function materialParts(root: Object3D): { geometry: BufferGeometry; material: Material }[] {
+export function materialParts(
+  root: Object3D,
+  modelSpace = root,
+): { geometry: BufferGeometry; material: Material }[] {
   root.updateWorldMatrix(true, true);
-  const inverse = new Matrix4().copy(root.matrixWorld).invert();
+  const inverse = new Matrix4().copy(modelSpace.matrixWorld).invert();
   const groups = new Map<Material, BufferGeometry[]>();
   root.traverse((node) => {
     if (!(node instanceof Mesh)) return;

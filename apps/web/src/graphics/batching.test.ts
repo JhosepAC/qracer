@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import {
+  Box3,
   BufferGeometry,
   Group,
   Int16BufferAttribute,
@@ -6,8 +8,10 @@ import {
   Mesh,
   MeshStandardMaterial,
 } from "three";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { expect, it } from "vitest";
-import { materialParts } from "./batching.ts";
+import { assetRoot, materialParts } from "./batching.ts";
 
 it("bakes the node transform of quantized geometry without clipping it", () => {
   const geometry = new BufferGeometry();
@@ -38,4 +42,30 @@ it("bakes the node transform of quantized geometry without clipping it", () => {
   material.dispose();
   geometry.dispose();
   part.geometry.dispose();
+});
+
+it("keeps both production coupe LODs at authored scale and wheel height", async () => {
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  async function load(path: string) {
+    const bytes = await readFile(new URL(path, import.meta.url));
+    return (await loader.parseAsync(new Uint8Array(bytes).buffer, "")).scene;
+  }
+
+  const original = await load("../../public/assets/probe/coupe.glb");
+  const compressed = await load("../../public/assets/coast/coupe.glb");
+  for (const lod of [0, 1]) {
+    const reference = new Box3().setFromObject(assetRoot(original, "qracer_lod", lod), true);
+    const model = assetRoot(compressed, "qracer_lod", lod);
+    const bounds = new Box3().makeEmpty();
+    for (const { geometry } of materialParts(model, compressed)) {
+      geometry.computeBoundingBox();
+      if (geometry.boundingBox) bounds.union(geometry.boundingBox);
+      geometry.dispose();
+    }
+    for (const axis of ["x", "y", "z"] as const) {
+      expect(bounds.min[axis]).toBeCloseTo(reference.min[axis], 3);
+      expect(bounds.max[axis]).toBeCloseTo(reference.max[axis], 3);
+    }
+    expect(bounds.min.y).toBeGreaterThanOrEqual(-0.001);
+  }
 });
