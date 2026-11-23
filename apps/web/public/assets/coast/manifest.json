@@ -6,5 +6,9 @@
   "coast.glb": {
     "bytes": 323700,
     "sha256": "dc6069c666fb492ab577d287fcdbf22e1c670d68eb80ae562a25dca4fc66e21c"
+  },
+  "props.glb": {
+    "bytes": 59308,
+    "sha256": "63abca8bc7327bf05a9fe1188ded1f611935264b178d36db1993172dc78232be"
   }
 }
