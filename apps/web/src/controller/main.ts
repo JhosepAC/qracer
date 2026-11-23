@@ -22,8 +22,8 @@ root.innerHTML = `
         <input id="join-link" type="url" maxlength="512" autocomplete="off" spellcheck="false" required>
         <button class="button primary" type="submit">Solicitar acceso</button>
       </form>
-      <button type="button" class="button" id="leave" hidden>Cerrar conexión</button>
       ${controlsMarkup}
+      <button type="button" class="button" id="leave" hidden>Cerrar conexión</button>
       <a class="text-link" href="/play/">Volver a QRacer</a>
     </section>
   </main>`;
