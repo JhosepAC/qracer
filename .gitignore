@@ -16,6 +16,11 @@ artifacts/
 .vite/
 .turbo/
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
 
 # Tests, coverage, recordings and profiling
 coverage/

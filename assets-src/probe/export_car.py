@@ -104,7 +104,7 @@ def export(root, source_scene, revision=""):
         report["bytes"] = target.stat().st_size
         if not 0 < report["bytes"] <= 8 * 1024 * 1024:
             raise RuntimeError("Asset size budget failed")
-        (root / "assets-src/probe/coupe.metrics.json").write_text(json.dumps(report, indent=2))
+        (root / "assets-src/probe/coupe.metrics.json").write_text(json.dumps(report, indent=2) + "\n")
         return report
     finally:
         bpy.context.window.scene = old
