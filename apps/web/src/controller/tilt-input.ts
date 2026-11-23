@@ -6,18 +6,31 @@ export const angularDelta = (current: number, center: number) =>
 
 export class TiltFilter {
   private center?: number;
+  private reference = 0;
+  private stable = 0;
   private last = -Infinity;
   private filtered = 0;
 
   reset() {
     delete this.center;
+    this.stable = 0;
     this.last = -Infinity;
     this.filtered = 0;
   }
 
   update(roll: number, now: number) {
     if (!Number.isFinite(roll)) return;
-    if (this.center === undefined) this.center = roll;
+    if (!this.fresh(now)) this.reset();
+    if (this.center === undefined) {
+      if (!this.stable || Math.abs(angularDelta(roll, this.reference)) > 3) {
+        this.reference = roll;
+        this.stable = 0;
+      }
+      this.stable++;
+      if (this.stable === 4) this.center = roll;
+      this.last = now;
+      return;
+    }
     const delta = angularDelta(roll, this.center);
     const target = Math.sign(delta) * Math.min(1, Math.max(0, (Math.abs(delta) - 3) / 22));
     const time = Math.max(0, Math.min(100, now - this.last));
@@ -32,6 +45,10 @@ export class TiltFilter {
   fresh(now: number) {
     return now - this.last < STALE_MS;
   }
+
+  get calibrated() {
+    return this.center !== undefined;
+  }
 }
 
 export class TiltInput {
@@ -39,8 +56,7 @@ export class TiltInput {
   active = false;
   samples = 0;
   rotations = 0;
-  private knownAt = 0;
-  private resetAt = 0;
+  private lastSample = 0;
   private attempts = 0;
   private readonly onStatus: (status: string) => void;
 
@@ -59,15 +75,17 @@ export class TiltInput {
         return;
       const legacy = (window as Window & { orientation?: number }).orientation;
       const angle = screen.orientation?.angle ?? legacy ?? 0;
-      this.filter.update(screenRoll(beta, gamma, angle), performance.now());
+      const now = performance.now();
+      const wasCalibrated = this.filter.calibrated && this.filter.fresh(now);
+      this.filter.update(screenRoll(beta, gamma, angle), now);
+      this.lastSample = now;
       this.samples++;
-      if (this.samples === this.knownAt + 1)
-        this.onStatus("Inclinación activa. El táctil tiene prioridad.");
+      if (!wasCalibrated && this.filter.calibrated)
+        this.onStatus("Inclinación activa. Inclina el móvil para girar.");
     });
     const rotate = () => {
       this.rotations++;
       this.center();
-      if (this.active) this.onStatus("Pantalla girada. Mantén el móvil centrado.");
     };
     if (screen.orientation) screen.orientation.addEventListener("change", rotate);
     else window.addEventListener("orientationchange", rotate);
@@ -88,7 +106,6 @@ export class TiltInput {
       if (permission !== "granted") throw new Error("Permiso denegado. El mando sigue en táctil.");
       this.active = true;
       this.center();
-      this.onStatus("Mantén el móvil en posición cómoda para centrarlo.");
     } catch (error) {
       if (attempt !== this.attempts) return;
       this.stop();
@@ -99,9 +116,9 @@ export class TiltInput {
   }
 
   center() {
-    this.knownAt = this.samples;
-    this.resetAt = performance.now();
+    this.lastSample = performance.now();
     this.filter.reset();
+    if (this.active) this.onStatus("Mantén el móvil quieto en posición cómoda para centrarlo.");
   }
 
   stop() {
@@ -112,7 +129,7 @@ export class TiltInput {
 
   value(now: number) {
     if (!this.active) return 0;
-    if (!this.filter.fresh(now) && now - this.resetAt > 1000) {
+    if (now - this.lastSample > 1000) {
       this.stop();
       this.onStatus("El sensor dejó de responder. El mando sigue en táctil.");
       return 0;

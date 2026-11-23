@@ -10,14 +10,17 @@ it("maps axes across both landscape rotations and wraps angular differences", ()
 });
 it("calibrates, filters inside a physical dead zone and clears stale samples", () => {
   const filter = new TiltFilter();
-  filter.update(10, 100);
+  filter.update(42, 45);
+  filter.update(12, 55);
+  for (const time of [70, 85, 100]) filter.update(10, time);
+  expect(filter.calibrated).toBe(true);
   filter.update(12.9, 130);
   expect(filter.value(130)).toBe(0);
   filter.update(35, 160);
   expect(filter.value(160)).toBeGreaterThan(0.25);
   expect(filter.value(160)).toBeLessThan(0.5);
   expect(filter.value(310)).toBe(0);
-  filter.reset();
   filter.update(-13, 340);
+  expect(filter.calibrated).toBe(false);
   expect(filter.value(340)).toBe(0);
 });
