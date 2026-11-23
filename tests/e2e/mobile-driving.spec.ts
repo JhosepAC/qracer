@@ -23,6 +23,7 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
   let dropInput = false;
   let twoFingers = false;
   let tiltSteering = false;
+  let pauseSent = false;
   await phone.routeWebSocket("**/session/ws/**", (client) => {
     const server = client.connectToServer();
     client.onMessage((raw) => {
@@ -31,6 +32,7 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
         twoFingers = true;
       if (frame.type === "INPUT" && frame.input.throttle === 0 && frame.input.steer > 0.2)
         tiltSteering = true;
+      if (!dropInput && frame.type === "DRIVE_PAUSE") pauseSent = true;
       if (dropInput && (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE")) return;
       server.send(raw);
     });
@@ -141,8 +143,11 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await resume.click();
     await expect(phone.locator("#drive-state")).toContainText("Cuenta atrás");
     await expect(phone.locator("#drive-state")).toContainText("En carrera", { timeout: 20000 });
+    pauseSent = false;
     await phone.getByRole("button", { name: "Pausa", exact: true }).click();
-    await expect(page.locator("#summary")).toContainText("El móvil solicitó una pausa");
+    await expect.poll(() => pauseSent).toBe(true);
+    // An already-expired watchdog may pause just before the explicit command arrives.
+    await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
     await page.getByRole("button", { name: "Usar teclado" }).click();
     await expect(page.locator("#app")).toHaveAttribute("data-control", "keyboard");
   } finally {
