@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "skills": {
+    "blender-asset-qa": {
+      "source": "EL4CTEO/blender-skills",
+      "commit": "1a1cc6c49312f9f370aae86f52b7b907f29c94f6",
+      "sourceType": "github",
+      "skillPath": "skills/blender-asset-qa/SKILL.md",
+      "computedHash": "1a757fcaddcf45ca14feb7de56c6804d0ac4451f8a1a44e439034cf25b9fc9d4",
+      "installMode": "copy"
+    },
+    "blender-core": {
+      "source": "EL4CTEO/blender-skills",
+      "commit": "1a1cc6c49312f9f370aae86f52b7b907f29c94f6",
+      "sourceType": "github",
+      "skillPath": "skills/blender-core/SKILL.md",
+      "computedHash": "edf8f6757070df97c95bbb2168c35634b4d2145024481977885ab786abfea9bd",
+      "installMode": "copy"
+    },
+    "blender-environment-kits": {
+      "source": "EL4CTEO/blender-skills",
+      "commit": "1a1cc6c49312f9f370aae86f52b7b907f29c94f6",
+      "sourceType": "github",
+      "skillPath": "skills/blender-environment-kits/SKILL.md",
+      "computedHash": "4cfe794777d0c79651ae90d19d5bcb835aeeda0b747ab416552baf24718f9386",
+      "installMode": "copy"
+    },
+    "blender-game-optimization": {
+      "source": "EL4CTEO/blender-skills",
+      "commit": "1a1cc6c49312f9f370aae86f52b7b907f29c94f6",
+      "sourceType": "github",
+      "skillPath": "skills/blender-game-optimization/SKILL.md",
+      "computedHash": "1dd5ed37d2b53eb05428817e7d44fad60fb5f139a7190efa0fce97e04b117654",
+      "installMode": "copy"
+    },
+    "blender-hardsurface-modeling": {
+      "source": "EL4CTEO/blender-skills",
+      "commit": "1a1cc6c49312f9f370aae86f52b7b907f29c94f6",
+      "sourceType": "github",
+      "skillPath": "skills/blender-hardsurface-modeling/SKILL.md",
+      "computedHash": "56c9509aef0bde2636be665d0fc91822a7321beebc04c99aa728a0704f1d282d",
+      "installMode": "copy"
+    },
+    "threejs-performance": {
+      "source": "CloudAI-X/threejs-skills",
+      "commit": "0e181866f095b5f06d005133876e926515390d95",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-performance/SKILL.md",
+      "computedHash": "edc078cf2cb729eb4a808ee3c202f4bdbda40a0beb6e34f2cf7b1f5003f11783",
+      "installMode": "copy"
+    }
+  }
+}
