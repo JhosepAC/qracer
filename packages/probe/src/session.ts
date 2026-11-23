@@ -127,6 +127,8 @@ export class ProbeSession {
     }
     if (message.type === "INPUT") {
       if (peer.role !== "controller") return reject("Controller input only");
+      if (![...this.peers.values()].some((other) => other.role === "host"))
+        return reject("Host unavailable");
       if (message.seq <= peer.seq) return { send: [] };
       peer.seq = message.seq;
     }

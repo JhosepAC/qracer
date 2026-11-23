@@ -59,9 +59,15 @@ export function createProbe(origins: Set<string>, creationKey?: string) {
       const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
         request.socket.remoteAddress ?? "",
       );
+      const localCaller =
+        loopback ||
+        Boolean(
+          request.socket.remoteAddress &&
+            request.socket.remoteAddress === request.socket.localAddress,
+        );
       const authorized = creationKey
         ? equalToken(request.headers.authorization?.replace(/^Bearer /, "") ?? "", creationKey)
-        : loopback;
+        : localCaller;
       if (!authorized) response.writeHead(403).end();
       else if (request.method !== "POST") response.writeHead(405, { Allow: "POST" }).end();
       else if (rooms.size >= 8) response.writeHead(429, { "Retry-After": "60" }).end();
