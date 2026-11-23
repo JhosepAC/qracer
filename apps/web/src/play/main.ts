@@ -226,6 +226,8 @@ function run(reset: boolean) {
     clock.reset(createRace());
     feedbackUntil = 0;
     assisted = false;
+  } else if (source === "mobile" && clock.current.phase === "countdown") {
+    clock.reset({ ...clock.current, countdown: 3 * TICK_HZ });
   }
   keys.clear();
   resumeUntil =
@@ -381,7 +383,7 @@ restart.onclick = () => run(true);
 resume.onclick = () => run(false);
 pause.onclick = () => stop();
 window.addEventListener("keydown", (event) => {
-  if (event.ctrlKey || event.altKey || event.metaKey || clock.paused) return;
+  if (event.ctrlKey || event.altKey || event.metaKey || (clock.paused && !resumeUntil)) return;
   if (event.code === "Escape") {
     event.preventDefault();
     if (!event.repeat) stop();
@@ -398,7 +400,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && (!clock.paused || resumeUntil)) stop();
 });
 window.addEventListener("pagehide", () => {
-  if (!clock.paused) stop();
+  if (!clock.paused || resumeUntil) stop();
   loading?.abort();
   loading = undefined;
   view?.dispose();

@@ -2,9 +2,10 @@
 
 Juego arcade 3D para navegador de PC, controlado desde un teléfono mediante un código QR. El mando web funciona sin instalar una aplicación; gráficos, conexión y controles cuentan con alternativas según las capacidades del dispositivo.
 
-**Estado:** en PC puedes jugar la carrera costera con teclado y aprobar la vinculación
-de un móvil. Los controles móviles de carrera corresponden a F05. El laboratorio
-F02 de sensores, relay y rendimiento sigue en validación.
+**Estado:** la carrera costera se puede jugar con teclado o con un móvil
+vinculado. El mando incluye volante táctil, botones, inclinación opcional y
+pausa segura al perder la entrada. El laboratorio F02 de sensores, relay y
+rendimiento sigue en validación.
 Instrucciones del laboratorio en [PROBES.md](PROBES.md).
 
 - [Instrucciones para agentes](AGENTS.md)
@@ -71,8 +72,16 @@ permite solo ese puerto en tu red privada.
    y **Generar invitación**.
 2. Escanea el QR desde el móvil o abre `/controller/` en ese mismo origen y
    pega el enlace. Comprueba que ambos dispositivos muestran el mismo código.
-3. Aprueba en la PC. El panel permite invitar un sustituto, revocar o cerrar
-   la sala. Recargar el móvil dentro del plazo de reconexión conserva el vínculo.
+3. Aprueba en la PC y cierra el panel. Suelta los controles del móvil y elige
+   **Jugar con móvil** cuando aparezca como listo.
+4. Mira la carretera en la PC. En el teléfono puedes girar con el volante o las
+   flechas y acelerar a la vez con otro dedo. Freno tiene prioridad. Al volver
+   de una interrupción, suelta los controles y pulsa **Continuar** en la PC.
+
+El mando funciona por táctil en LAN HTTP. **Activar inclinación** y mantener
+la pantalla activa requieren HTTPS y soporte del navegador. Denegar el permiso
+conserva el táctil. Los ajustes incluyen calibración, lateralidad, sensibilidad,
+giro invertido, asistencia y vibración cuando el teléfono la ofrece.
 
 En loopback la PC permite probar el enlace en otro navegador local. Para
 mostrar un QR que el teléfono pueda abrir, entra en la PC por su IP LAN.
