@@ -87,6 +87,7 @@ export function mountPairing(trigger: HTMLButtonElement) {
   }
 
   function render() {
+    generate.hidden = Boolean(state?.request);
     generate.disabled = Boolean(pendingFetch || (session && !state));
     generate.textContent = state?.linked ? "Invitar otro móvil" : "Generar invitación";
     revoke.hidden = !state?.linked;

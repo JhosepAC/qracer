@@ -26,6 +26,7 @@ test("pairs by pasted link, consumes the QR, reconnects and approves replacement
     const panel = page.getByRole("dialog", { name: "Conecta tu móvil" });
     await panel.getByRole("button", { name: "Generar invitación" }).click();
     await expect(panel.getByRole("img", { name: "Código QR de invitación" })).toBeVisible();
+    await expect(panel.locator("#host-qr svg")).toBeVisible();
     const url = await panel.getByLabel("Enlace de uso único").inputValue();
 
     const phone = await handset.newPage();

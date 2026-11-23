@@ -85,3 +85,15 @@
   opacity: 0.54;
   cursor: default;
 }
+
+.pair-dialog button:not(.primary),
+#leave {
+  color: #f3f6f3;
+  background: #22343b;
+  border: 1px solid #779098;
+}
+.pair-dialog button:not(.primary):hover,
+.pair-trigger:hover,
+#leave:hover {
+  background: #2d454e;
+}
