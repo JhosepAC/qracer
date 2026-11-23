@@ -60,6 +60,12 @@ export async function writeLicenses() {
   }
   // Vite injects its MIT-licensed module-preload helper into browser output.
   await visit(join(root, "package.json"), "vite", false);
+  records.set("basis-universal", {
+    name: "Basis Universal transcoder",
+    version: "bundled with three",
+    license: "Apache-2.0",
+    text: `Copyright Binomial LLC\n${await readFile(join(root, "licenses/basis-universal-apache-2.0.txt"), "utf8")}`,
+  });
   const entries = [...records.values()].sort((a, b) => a.name.localeCompare(b.name));
   const output = join(root, "artifacts/licenses");
   await mkdir(output, { recursive: true });

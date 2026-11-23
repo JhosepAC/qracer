@@ -31,8 +31,8 @@ import {
   Texture,
   WebGLRenderer,
 } from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetRoot, materialParts } from "../graphics/batching.ts";
+import { raceAssetLoader } from "./race-assets.ts";
 
 const colors = [0x469baf, 0xd06b56, 0xbfc8d8, 0x69759e].map((value) => new Color(value));
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
@@ -121,22 +121,27 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     sunlight.position.set(-40, 21, -28);
     scene.add(sunlight);
 
-    const loader = new GLTFLoader();
+    const loader = raceAssetLoader(renderer);
     async function load(name: string) {
-      const response = await fetch(`/assets/probe/${name}.glb`, {
+      const response = await fetch(`/assets/coast/${name}.glb`, {
         signal,
       });
       if (!response.ok) throw new Error("El servidor no pudo entregar los modelos del circuito.");
       const glb = await response.arrayBuffer();
       if (glb.byteLength > 8 * 1024 * 1024) throw new Error("Recurso fuera de presupuesto.");
-      const asset = await loader.parseAsync(glb, "");
+      const asset = await loader.models.parseAsync(glb, "");
       roots.push(asset.scene);
       signal.throwIfAborted();
       return asset.scene;
     }
 
-    const car = await load("coupe");
-    const coast = await load("coast");
+    const [car, coast] = await (async () => {
+      try {
+        return [await load("coupe"), await load("coast")] as const;
+      } finally {
+        loader.dispose();
+      }
+    })();
     const hero = batch(assetRoot(car, "qracer_lod", 0), 1);
     const traffic = batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC);
     const palms = batch(assetRoot(coast, "qracer_asset", "palm"), 16);
