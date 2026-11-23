@@ -6,6 +6,8 @@ Leer [docs/README.md](docs/README.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md
 
 ## Reglas obligatorias
 
+- Mantener `docs/` excluido de Git. No forzar su inclusión ni subir la planificación local.
+- Dividir cada fase en PR de hasta 12 archivos modificados y 800 líneas de código/configuración. El lockfile generado se identifica aparte. Realizar varios commits coherentes por incremento.
 - Usar trunk based development: `main` permanente y ramas cortas por incremento, integradas mediante PR/squash. No crear `develop` ni mantener una rama abierta durante una fase completa.
 - Usar Conventional Commits en commits, títulos de PR y squash final. Seguir tipos y scopes de `docs/DEVELOPMENT.md`.
 - Mantener coste de servicios USD 0. No añadir pasos obligatorios de pago, crédito temporal, TURN contratado o generación premium.
