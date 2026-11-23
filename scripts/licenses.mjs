@@ -34,6 +34,9 @@ export async function writeLicenses() {
         /* Try supported names. */
       }
     }
+    // This release omits LICENSE from npm; retain its upstream gitHead's full notice locally.
+    if (!licenseText && key === "qrcode-generator@2.0.4")
+      licenseText = await readFile(join(root, "licenses/qrcode-generator-2.0.4.txt"), "utf8");
     if (!licenseText || !metadata.license) throw new Error(`Missing license for ${key}`);
     records.set(key, {
       name: metadata.name,
