@@ -68,18 +68,7 @@ const speed = element("speed");
 const integrity = element("integrity");
 const nitro = element<HTMLMeterElement>("nitro");
 const keys = new Set<string>();
-const controls = [
-  "KeyA",
-  "KeyD",
-  "KeyW",
-  "KeyS",
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowUp",
-  "ArrowDown",
-  "ShiftLeft",
-  "ShiftRight",
-];
+const controls = /^(Key[ADWS]|Arrow(Left|Right|Up|Down)|Shift(Left|Right))$/;
 let feedback = "";
 let feedbackUntil = 0;
 const pressed = (...codes: string[]) => Number(codes.some((code) => keys.has(code)));
@@ -226,7 +215,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Escape") {
     event.preventDefault();
     if (!event.repeat) stop();
-  } else if (controls.includes(event.code)) {
+  } else if (controls.test(event.code)) {
     event.preventDefault();
     keys.add(event.code);
   }
