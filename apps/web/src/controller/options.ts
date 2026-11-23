@@ -2,14 +2,18 @@ import type { DriveFrame } from "@qracer/session-core/wire";
 import type { DriveChannel } from "../session/drive-channel.ts";
 import { TiltInput } from "./tilt-input.ts";
 
+export const steeringMarkup = `
+<div class="handset-modes" role="group" aria-label="Modo de dirección">
+  <button type="button" id="activate-tilt">Activar inclinación</button>
+  <button type="button" id="touch-only">Usar táctil</button>
+  <button type="button" id="center-tilt" hidden>Centrar inclinación</button>
+  <p id="tilt-status" role="status">Inclina el móvil para girar o usa el volante táctil.</p>
+</div>`;
+
 export const optionsMarkup = `
 <p id="mobile-feedback" class="mobile-feedback" aria-live="polite" hidden></p>
 <details class="handset-options"><summary>Ajustes y diagnóstico</summary>
   <div class="handset-options-grid">
-    <button type="button" id="activate-tilt">Activar inclinación</button>
-    <button type="button" id="touch-only">Usar táctil</button>
-    <button type="button" id="center-tilt">Centrar inclinación</button>
-    <p id="tilt-status" role="status">Modo táctil.</p>
     <label for="turn-side">Lado de los pedales</label><select id="turn-side"><option value="right">Derecha</option><option value="left">Izquierda</option></select>
     <label for="turn-sensitivity">Sensibilidad de giro</label><input id="turn-sensitivity" type="range" min="0.5" max="1.8" step="0.1" value="1">
     <label><input id="turn-invert" type="checkbox"> Invertir volante e inclinación</label>
@@ -58,8 +62,18 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
   const wakeStatus = field("wake-status");
   const tiltStatus = field("tilt-status");
   const flash = field("mobile-feedback");
+  const activate = field<HTMLButtonElement>("activate-tilt");
+  const center = field<HTMLButtonElement>("center-tilt");
+  const tiltAvailable = isSecureContext && "DeviceOrientationEvent" in window;
+  activate.disabled = !tiltAvailable;
+  if (!tiltAvailable)
+    tiltStatus.textContent = isSecureContext
+      ? "Sensor de inclinación no disponible. El táctil está listo."
+      : "La inclinación requiere HTTPS. El táctil está listo.";
   const tilt = new TiltInput((message) => {
     tiltStatus.textContent = message;
+    center.hidden = !tilt.active;
+    activate.hidden = tilt.active;
   });
   const feedback = new FeedbackWindow();
   let lock: WakeLockSentinel | undefined;
@@ -144,16 +158,18 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
     vibration.parentElement?.append(" · no disponible");
   }
   save();
-  field("activate-tilt").onclick = () => {
+  activate.onclick = () => {
     clearTouch();
     void tilt.enable();
   };
   field("touch-only").onclick = () => {
     clearTouch();
     tilt.stop();
+    center.hidden = true;
+    activate.hidden = false;
     tiltStatus.textContent = "Modo táctil.";
   };
-  field("center-tilt").onclick = () => {
+  center.onclick = () => {
     clearTouch();
     tilt.center();
   };
@@ -195,7 +211,11 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
       feedback.reset();
       tilt.center();
       flash.hidden = true;
-      if (!linked) tilt.stop();
+      if (!linked) {
+        tilt.stop();
+        center.hidden = true;
+        activate.hidden = false;
+      }
       void wake();
     },
     steer(now: number) {
