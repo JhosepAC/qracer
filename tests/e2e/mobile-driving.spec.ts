@@ -5,15 +5,20 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
 }, info) => {
   test.setTimeout(85000);
   await page.setViewportSize({ width: 480, height: 320 });
-  await page.addInitScript(() => {
-    const request = window.requestAnimationFrame.bind(window);
-    let time = 0;
-    window.requestAnimationFrame = (callback) =>
-      request(() => {
-        time += 1000 / 20;
-        callback(time);
-      });
-  });
+  // Keep transport and simulation on real clocks. The separate graphics tests and
+  // the packaged LAN smoke exercise WebGL. Software GPU stalls should not drive this test.
+  await page.route("**/assets/race-view-*.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `
+      export async function createRaceView(container) {
+        const canvas = document.createElement("canvas");
+        container.append(canvas);
+        return { canvas, draw() {}, stats: () => ({}), dispose: () => canvas.remove() };
+      }
+    `,
+    }),
+  );
   const handset = await chromium.launch();
   const phone = await handset.newPage({
     viewport: { width: 390, height: 844 },
