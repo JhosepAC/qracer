@@ -1,13 +1,14 @@
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { ROOM_ID, TOKEN } from "@qracer/session-core/wire";
 import { parseInvitation, type RoomToken, SessionLink, sessionError } from "../session/link.ts";
+import { featureFlags } from "../features.ts";
 import "../styles.css";
 import "../session/pair.css";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing application root");
 root.dataset.protocolVersion = String(PROTOCOL_VERSION);
-root.dataset.pairingEnabled = "true";
+root.dataset.pairingEnabled = String(featureFlags.pairing.enabled);
 root.innerHTML = `
   <header class="topbar"><a class="brand" href="/play/">Q<span>Racer</span></a><span class="tag">Tu mando</span></header>
   <main class="controller-shell">
@@ -123,13 +124,18 @@ leave.onclick = () => {
   status.textContent = "Conexión cerrada en este móvil. Pega una nueva invitación para volver.";
 };
 
-const invitation = parseInvitation(location.href);
-if (location.hash || location.search) history.replaceState(null, "", location.pathname);
-if (invitation) connect(invitation);
-else {
+function acceptLocation() {
+  const invitation = parseInvitation(location.href);
+  if (location.hash || location.search) history.replaceState(null, "", location.pathname);
+  if (!invitation) return false;
+  connect(invitation);
+  return true;
+}
+if (!acceptLocation()) {
   const saved = readStored();
   if (saved) connect(saved, true);
 }
+window.addEventListener("hashchange", acceptLocation);
 window.addEventListener("pagehide", () => link?.dispose());
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;

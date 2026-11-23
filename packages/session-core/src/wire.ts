@@ -43,7 +43,7 @@ export type ServerFrame =
       request?: string;
       code?: string;
     }
-  | { type: "INVITE"; token: string; until: number }
+  | { type: "INVITE"; token: string; until: number; ttl: number }
   | { type: "RESUME"; token: string }
   | { type: "ERROR"; code: ErrorCode };
 

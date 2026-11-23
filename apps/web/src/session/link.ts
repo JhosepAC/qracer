@@ -1,5 +1,6 @@
 import {
   AUTH_MS,
+  INVITE_MS,
   type ClientFrame,
   type Creation,
   type ErrorCode,
@@ -91,9 +92,13 @@ function parseServer(raw: string): ServerFrame | undefined {
         typeof data.token === "string" &&
         TOKEN.test(data.token) &&
         typeof data.until === "number" &&
-        Number.isSafeInteger(data.until)
+        Number.isSafeInteger(data.until) &&
+        typeof data.ttl === "number" &&
+        Number.isSafeInteger(data.ttl) &&
+        data.ttl >= 0 &&
+        data.ttl <= INVITE_MS
       )
-        return { type: "INVITE", token: data.token, until: data.until };
+        return { type: "INVITE", token: data.token, until: data.until, ttl: data.ttl };
       return;
     case "RESUME":
       if (typeof data.token === "string" && TOKEN.test(data.token))

@@ -2,6 +2,7 @@ import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { featureFlags } from "../features.ts";
 import "../styles.css";
+import "../session/pair.css";
 import "./race.css";
 import type { createRaceView } from "./race-view.ts";
 
@@ -26,6 +27,7 @@ root.innerHTML = `
       <div><dt>Nitro</dt><dd><kbd>Shift</kbd></dd></div></dl>
       <button class="button primary" type="button" id="start" disabled>Salir a pista</button>
       <p id="graphics-status" role="status">Cargando circuito…</p>
+      <button type="button" id="host-pair" class="button pair-trigger" hidden>Conectar móvil</button>
       <a href="/controller/">Conocer el mando</a>
     </section>
   </main>
@@ -46,6 +48,21 @@ function element<T extends HTMLElement>(id: string): T {
   if (!result) throw new Error(`Missing #${id}`);
   return result as T;
 }
+
+const pair = element<HTMLButtonElement>("host-pair");
+pair.hidden = !featureFlags.pairing.enabled;
+pair.onclick = async () => {
+  try {
+    pair.disabled = true;
+    const { mountPairing } = await import("../session/host.ts");
+    mountPairing(pair);
+    pair.disabled = false;
+    pair.click();
+  } catch {
+    pair.disabled = false;
+    element("graphics-status").textContent = "No se pudo abrir el panel de vinculación.";
+  }
+};
 
 const preview = element("preview");
 const start = element<HTMLButtonElement>("start");

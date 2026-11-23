@@ -353,7 +353,7 @@ export class RoomSession {
       }
       const until = Math.min(now + INVITE_MS, this.until);
       state.invite = { hash: fresh.hash, until };
-      effects.push({ id, frame: { type: "INVITE", token: fresh.token, until } });
+      effects.push({ id, frame: { type: "INVITE", token: fresh.token, until, ttl: until - now } });
     } else if (message.type === "REVOKE") {
       const current = state.controller?.id;
       if (current) {
