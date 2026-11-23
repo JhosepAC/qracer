@@ -1,4 +1,6 @@
 import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
+import type { DriveFrame, DriveMode } from "@qracer/session-core/wire";
+import { DriveChannel, RemoteInput } from "../session/drive-channel.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { featureFlags } from "../features.ts";
 import "../styles.css";
@@ -28,6 +30,8 @@ root.innerHTML = `
       <button class="button primary" type="button" id="start" disabled>Salir a pista</button>
       <p id="graphics-status" role="status">Cargando circuito…</p>
       <button type="button" id="host-pair" class="button pair-trigger" hidden>Conectar móvil</button>
+      <button class="button primary" type="button" id="start-mobile" hidden disabled>Jugar con móvil</button>
+      <p id="drive-link" class="fine-print" hidden></p>
       <a href="/controller/">Conocer el mando</a>
     </section>
   </main>
@@ -35,12 +39,14 @@ root.innerHTML = `
     <div class="race-score"><span>Puntos</span><strong id="score">0</strong><small id="distance">0 m</small></div>
     <div class="race-dials"><span id="integrity">Integridad 3/3</span><label>Nitro <meter id="nitro" min="0" max="1" value="1"></meter></label>
       <div class="race-speed"><strong id="speed">80</strong> km/h</div></div>
+    <small id="race-link" class="race-message race-link" hidden></small>
     <p class="race-message" id="message"></p>
   </section>
   <section class="race-overlay race-controls" id="overlay" aria-labelledby="overlay-title" hidden>
     <h2 id="overlay-title"></h2><p id="summary"></p>
     <button class="button primary" type="button" id="resume">Continuar</button>
     <button class="button" type="button" id="restart">Reiniciar</button>
+    <button class="button" type="button" id="keyboard-fallback" hidden>Usar teclado</button>
   </section>`;
 
 function element<T extends HTMLElement>(id: string): T {
@@ -55,7 +61,7 @@ pair.onclick = async () => {
   try {
     pair.disabled = true;
     const { mountPairing } = await import("../session/host.ts");
-    mountPairing(pair);
+    mountPairing(pair, { connection: mobileConnection, message: mobileFrame });
     pair.disabled = false;
     pair.click();
   } catch {
@@ -78,23 +84,57 @@ const speed = element("speed");
 const integrity = element("integrity");
 const nitro = element<HTMLMeterElement>("nitro");
 const keys = new Set<string>();
+const remote = new RemoteInput();
+const channel = new DriveChannel();
+let sendDrive: ((frame: DriveFrame) => boolean) | undefined;
+let source: "keyboard" | "mobile" = "keyboard";
+let resumeUntil = 0;
+let assisted = false;
+let lastState = -Infinity;
+let eventId = 0;
+const startMobile = element<HTMLButtonElement>("start-mobile");
+const driveLink = element("drive-link");
+const raceLink = element("race-link");
+const fallback = element<HTMLButtonElement>("keyboard-fallback");
 const controls = /^(Key[ADWS]|Arrow(Left|Right|Up|Down)|Shift(Left|Right))$/;
 let feedback = "";
 let feedbackUntil = 0;
 const pressed = (...codes: string[]) => Number(codes.some((code) => keys.has(code)));
 const clock = new FixedClock(createRace(), (state) => {
+  const input = source === "mobile" ? remote.get(performance.now()) : neutralInput;
+  if ("assist" in input && input.assist) assisted = true;
   const next = stepRace(
     state,
-    keys.size
-      ? {
-          steer: pressed("KeyD", "ArrowRight") - pressed("KeyA", "ArrowLeft"),
-          throttle: pressed("KeyW", "ArrowUp"),
-          brake: pressed("KeyS", "ArrowDown"),
-          boost: Boolean(pressed("ShiftLeft", "ShiftRight")),
-        }
-      : neutralInput,
+    source === "mobile"
+      ? input
+      : keys.size
+        ? {
+            steer: pressed("KeyD", "ArrowRight") - pressed("KeyA", "ArrowLeft"),
+            throttle: pressed("KeyW", "ArrowUp"),
+            brake: pressed("KeyS", "ArrowDown"),
+            boost: Boolean(pressed("ShiftLeft", "ShiftRight")),
+          }
+        : neutralInput,
   );
   const event = next.events.find(({ type }) => type === "impact") ?? next.events.at(-1);
+  if (source === "mobile" && channel.epoch !== undefined && !resumeUntil) {
+    const kind =
+      event?.type === "impact"
+        ? "impact"
+        : event?.type === "near"
+          ? "near"
+          : next.driver.boosting && !state.driver.boosting
+            ? "boost"
+            : undefined;
+    if (kind)
+      sendDrive?.({
+        type: "FEEDBACK",
+        epoch: channel.epoch,
+        id: ++eventId,
+        kind,
+        captured: performance.now(),
+      });
+  }
   if (event) {
     feedback = { impact: "Impacto", graze: "Roce", near: "¡Por poco!", overtake: "Adelantamiento" }[
       event.type
@@ -119,15 +159,17 @@ function updateHud() {
   score.textContent = String(state.score);
   integrity.textContent = `Integridad ${state.driver.integrity}/${state.config.integrity}`;
   nitro.value = state.config.nitroSeconds > 0 ? state.driver.nitro / state.config.nitroSeconds : 0;
-  message.textContent =
-    state.phase === "countdown"
+  message.textContent = resumeUntil
+    ? String(Math.max(1, Math.ceil((resumeUntil - performance.now()) / 1000)))
+    : state.phase === "countdown"
       ? String(Math.ceil(state.countdown / TICK_HZ))
       : state.tick < feedbackUntil
         ? feedback
         : "";
 }
 
-function stop(finished = false) {
+function stop(finished = false, reason = "") {
+  resumeUntil = 0;
   clock.pause();
   keys.clear();
   cancelAnimationFrame(raf);
@@ -139,16 +181,28 @@ function stop(finished = false) {
   hud.hidden = true;
   element("overlay-title").textContent = finished ? "Fin de carrera" : "Carrera en pausa";
   element("summary").textContent = finished
-    ? `${clock.current.score} puntos · ${Math.floor(clock.current.driver.s)} m · Máxima ${Math.round(clock.current.topSpeed * 3.6)} km/h · ${clock.current.overtakes} adelantamientos · ${clock.current.nearMisses} casi accidentes`
-    : "Pulsa Continuar para volver a la pista.";
+    ? `${assisted ? "Asistida · " : ""}${clock.current.score} puntos · ${Math.floor(clock.current.driver.s)} m · Máxima ${Math.round(clock.current.topSpeed * 3.6)} km/h · ${clock.current.overtakes} adelantamientos · ${clock.current.nearMisses} casi accidentes`
+    : reason || "Pulsa Continuar para volver a la pista.";
   resume.hidden = finished;
   resume.disabled = contextLost;
   restart.disabled = contextLost;
+  fallback.hidden = source !== "mobile";
   if (!document.hidden) (finished ? restart : resume).focus();
 }
 
 function frame(now: number) {
   if (!view) return;
+  if (source === "mobile" && remote.timedOut(performance.now()))
+    return stop(false, "Se perdió la entrada del mando. Suelta los controles para continuar.");
+  if (resumeUntil) {
+    if (performance.now() < resumeUntil) {
+      updateHud();
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+    resumeUntil = 0;
+    clock.resume();
+  }
   const alpha = clock.frame(now);
   if (clock.current.phase === "finished") return stop(true);
   if (clock.paused) return stop();
@@ -161,13 +215,27 @@ function frame(now: number) {
 }
 
 function run(reset: boolean) {
-  if (!view || contextLost || document.hidden) return;
+  if (
+    !view ||
+    contextLost ||
+    document.hidden ||
+    (source === "mobile" && !remote.ready(performance.now()))
+  )
+    return;
   if (reset) {
     clock.reset(createRace());
     feedbackUntil = 0;
+    assisted = false;
   }
   keys.clear();
-  clock.resume();
+  resumeUntil =
+    source === "mobile" && !reset && clock.current.phase === "racing"
+      ? performance.now() + 3000
+      : 0;
+  if (resumeUntil) clock.pause();
+  else clock.resume();
+  if (root) root.dataset.control = source;
+  raceLink.hidden = source !== "mobile";
   lastHud = -Infinity;
   root?.setAttribute("data-mode", "playing");
   element("menu").hidden = true;
@@ -179,6 +247,73 @@ function run(reset: boolean) {
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(frame);
 }
+
+function mobileConnection(epoch?: number, send?: (frame: DriveFrame) => boolean) {
+  const changed = channel.epoch !== epoch;
+  channel.configure(epoch, send);
+  remote.configure(epoch);
+  sendDrive = send;
+  if (changed && source === "mobile" && (!clock.paused || resumeUntil))
+    stop(false, "Se perdió la conexión con el mando. Espera a que vuelva o usa el teclado.");
+  refreshMobile(performance.now());
+}
+
+function mobileFrame(packet: DriveFrame) {
+  const now = performance.now();
+  if (!channel.receive(packet, now)) return;
+  if (packet.type === "INPUT")
+    remote.accept(packet, channel.sync.receiveTime(packet.captured, now), now);
+  else if (packet.type === "DRIVE_PAUSE" && packet.seq > remote.seq) {
+    remote.seq = packet.seq;
+    remote.clear();
+    if (source === "mobile" && (!clock.paused || resumeUntil))
+      stop(false, "El móvil solicitó una pausa. Suelta los controles para continuar.");
+  }
+}
+
+function refreshMobile(now: number) {
+  channel.tick(now);
+  const linked = channel.epoch !== undefined;
+  const ready = linked && remote.ready(now);
+  startMobile.hidden = driveLink.hidden = !linked;
+  startMobile.disabled = !view || contextLost || !ready;
+  const estimate = channel.sync.estimate(now);
+  const latency = estimate ? `RTT ${Math.round(estimate.rtt)} ms` : "Sincronizando";
+  const summary = ready ? `Mando listo · ${latency}` : `Suelta los controles · ${latency}`;
+  if (driveLink.textContent !== summary) driveLink.textContent = summary;
+  if (raceLink.textContent !== latency) raceLink.textContent = latency;
+  if (source === "mobile") {
+    resume.disabled = restart.disabled = contextLost || !ready;
+    if ((!clock.paused || resumeUntil) && remote.timedOut(now))
+      stop(false, "Se perdió la entrada del mando. Suelta los controles para continuar.");
+  }
+  if (!linked || now - lastState < 200 || channel.epoch === undefined) return;
+  lastState = now;
+  const state = clock.current;
+  const mode: DriveMode =
+    state.phase === "finished"
+      ? "results"
+      : source === "keyboard"
+        ? root?.dataset.mode === "menu"
+          ? "ready"
+          : "keyboard"
+        : resumeUntil
+          ? "countdown"
+          : clock.paused
+            ? "paused"
+            : state.phase;
+  sendDrive?.({
+    type: "DRIVE_STATE",
+    epoch: channel.epoch,
+    mode,
+    speed: state.driver.speed * 3.6,
+    integrity: state.driver.integrity,
+    nitro: state.config.nitroSeconds > 0 ? state.driver.nitro / state.config.nitroSeconds : 0,
+  });
+}
+window.setInterval(() => {
+  if (channel.epoch !== undefined || source === "mobile") refreshMobile(performance.now());
+}, 25);
 
 async function mount() {
   const attempt = new AbortController();
@@ -202,7 +337,7 @@ async function mount() {
       event.preventDefault();
       contextLost = true;
       start.disabled = true;
-      if (!clock.paused) stop();
+      if (!clock.paused || resumeUntil) stop();
       resume.disabled = restart.disabled = true;
       status.textContent = "Se perdió el contexto gráfico.";
     });
@@ -230,7 +365,18 @@ async function mount() {
   }
 }
 
-start.onclick = () => run(true);
+start.onclick = () => {
+  source = "keyboard";
+  run(true);
+};
+startMobile.onclick = () => {
+  source = "mobile";
+  run(true);
+};
+fallback.onclick = () => {
+  source = "keyboard";
+  run(clock.current.phase === "finished");
+};
 restart.onclick = () => run(true);
 resume.onclick = () => run(false);
 pause.onclick = () => stop();
@@ -239,17 +385,17 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Escape") {
     event.preventDefault();
     if (!event.repeat) stop();
-  } else if (controls.test(event.code)) {
+  } else if (source === "keyboard" && controls.test(event.code)) {
     event.preventDefault();
     keys.add(event.code);
   }
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => {
-  if (!clock.paused) stop();
+  if (!clock.paused || resumeUntil) stop();
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && !clock.paused) stop();
+  if (document.hidden && (!clock.paused || resumeUntil)) stop();
 });
 window.addEventListener("pagehide", () => {
   if (!clock.paused) stop();
