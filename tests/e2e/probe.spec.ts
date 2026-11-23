@@ -40,7 +40,7 @@ test("probe authenticates two browsers, clears invitation and releases cancelled
     timeout: 7000,
   });
   await testInfo.attach("rtc-browser-result", {
-    body: await page.locator("#rtc-status").innerText(),
+    body: (await page.locator("#rtc-status").textContent()) ?? "",
     contentType: "text/plain",
   });
   await mobileContext.close();
