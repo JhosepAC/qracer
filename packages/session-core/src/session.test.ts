@@ -185,3 +185,17 @@ it("fences input by role, epoch and sequence, and caps bursts", async () => {
     { frame: { phase: "reconnecting" } },
   ]);
 });
+
+it("protects the host's revocation budget from driving traffic", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  await s.link(phone);
+  for (let i = 0; i < 12; i++)
+    expect(await s.send(s.host, { type: "SYNC", epoch: 1, id: i, t0: i })).toHaveLength(1);
+  expect(await s.send(s.host, { type: "SYNC", epoch: 1, id: 12, t0: 12 })).toEqual([]);
+  expect((await s.send(s.host, { type: "REVOKE" }))[0]).toMatchObject({
+    id: phone,
+    frame: { type: "ERROR", code: "REVOKED" },
+  });
+});
