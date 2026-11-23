@@ -66,6 +66,17 @@ export async function writeLicenses() {
     license: "Apache-2.0",
     text: `Copyright Binomial LLC\n${await readFile(join(root, "licenses/basis-universal-apache-2.0.txt"), "utf8")}`,
   });
+  for (const [name, version] of [
+    ["Barlow", "web-v13"],
+    ["Rajdhani", "web-v17"],
+  ]) {
+    records.set(name, {
+      name,
+      version,
+      license: "OFL-1.1",
+      text: await readFile(join(root, `licenses/ofl-${name.toLowerCase()}.txt`), "utf8"),
+    });
+  }
   const entries = [...records.values()].sort((a, b) => a.name.localeCompare(b.name));
   const output = join(root, "artifacts/licenses");
   await mkdir(output, { recursive: true });

@@ -1,5 +1,27 @@
+@font-face {
+  font-family: Barlow;
+  src: url("/assets/fonts/barlow-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Barlow;
+  src: url("/assets/fonts/barlow-600.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: Rajdhani;
+  src: url("/assets/fonts/rajdhani-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
 :root {
   font-family: Barlow, "Segoe UI", sans-serif;
+  --race-display: Rajdhani, "Arial Narrow", "Segoe UI", sans-serif;
   color: #f3f6f3;
   background: #10171b;
   font-synthesis: none;
@@ -33,10 +55,10 @@ a {
   border-bottom: 1px solid #34434a;
 }
 .brand {
+  font-family: var(--race-display);
   font-size: 1.75rem;
-  font-weight: 800;
-  font-style: italic;
-  letter-spacing: -0.07em;
+  font-weight: 700;
+  letter-spacing: -0.055em;
 }
 .brand span {
   color: #ffcb47;
