@@ -5,6 +5,7 @@ import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { health, MAX_MESSAGE_BYTES, parseClientMessage, PROTOCOL_VERSION } from "@qracer/protocol";
 import { WebSocketServer } from "ws";
 import { createProbe } from "./probe.ts";
+import { createSessions } from "./session.ts";
 
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -32,6 +33,7 @@ export function createRelay(options: {
 }) {
   const origins = new Set(options.allowedOrigins);
   const probe = createProbe(origins, options.probeKey);
+  const sessions = createSessions(origins);
   const sockets = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_MESSAGE_BYTES,
@@ -41,6 +43,7 @@ export function createRelay(options: {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
     if (probe.request(request, response)) return;
+    if (await sessions.request(request, response)) return;
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.writeHead(405, { Allow: "GET, HEAD" }).end();
       return;
@@ -86,6 +89,7 @@ export function createRelay(options: {
   });
   server.on("upgrade", (request, socket, head) => {
     if (probe.upgrade(request, socket, head)) return;
+    if (sessions.upgrade(request, socket, head)) return;
     if (
       request.url !== "/ws" ||
       !origins.has(request.headers.origin ?? "") ||
@@ -126,6 +130,7 @@ export function createRelay(options: {
     server,
     close: async () => {
       await probe.close();
+      await sessions.close();
       for (const peer of sockets.clients) peer.terminate();
       await new Promise<void>((done) => sockets.close(() => done()));
       await new Promise<void>((done) => server.close(() => done()));

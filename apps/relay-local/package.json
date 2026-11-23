@@ -10,6 +10,7 @@
   "dependencies": {
     "@qracer/probe": "workspace:*",
     "@qracer/protocol": "workspace:*",
+    "@qracer/session-core": "workspace:*",
     "ws": "8.23.0"
   },
   "devDependencies": {
