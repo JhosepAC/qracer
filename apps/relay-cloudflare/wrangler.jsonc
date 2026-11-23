@@ -35,7 +35,12 @@
         "LOCAL_DIAGNOSTICS": "false",
         "PROBE_ORIGINS": "https://qracer-f02.pages.dev"
       },
-      "durable_objects": { "bindings": [{ "name": "PROBES", "class_name": "ProbeRoom" }] }
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOMS", "class_name": "Room" },
+          { "name": "PROBES", "class_name": "ProbeRoom" }
+        ]
+      }
     }
   }
 }
