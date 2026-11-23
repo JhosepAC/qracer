@@ -19,7 +19,7 @@ root.innerHTML = `
         <button type="button" aria-label="Girar a la derecha">→</button>
         <button type="button">Freno</button><button type="button">Nitro</button></div>
       </fieldset>
-      <p class="fine-print">Sin permisos de sensores ni cámara hasta que elijas usarlos.</p>
+      <p class="fine-print">Los controles táctiles no necesitan acceso a los sensores.</p>
       <a class="text-link" href="/play/">Volver a QRacer</a>
     </section>
   </main>`;
