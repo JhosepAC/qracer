@@ -22,19 +22,22 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
   });
   let dropInput = false;
   let twoFingers = false;
+  let tiltSteering = false;
   await phone.routeWebSocket("**/session/ws/**", (client) => {
     const server = client.connectToServer();
     client.onMessage((raw) => {
       const frame = JSON.parse(String(raw));
       if (frame.type === "INPUT" && frame.input.throttle === 1 && frame.input.steer > 0.25)
         twoFingers = true;
+      if (frame.type === "INPUT" && frame.input.throttle === 0 && frame.input.steer > 0.2)
+        tiltSteering = true;
       if (dropInput && (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE")) return;
       server.send(raw);
     });
   });
   await phone.addInitScript(() => {
     Object.defineProperty(window.DeviceOrientationEvent, "requestPermission", {
-      value: async () => "denied",
+      value: async () => document.body.dataset.tiltPermission ?? "denied",
     });
     Object.defineProperty(window.navigator, "vibrate", {
       value: (duration: number) => {
@@ -57,10 +60,41 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
     await phone.getByRole("button", { name: "Activar inclinación" }).click();
     await expect(phone.locator("#tilt-status")).toContainText("Permiso denegado");
+    await phone.evaluate(() => {
+      document.body.dataset.tiltPermission = "granted";
+    });
+    await phone.getByRole("button", { name: "Activar inclinación" }).click();
+    await phone.evaluate(async () => {
+      window.dispatchEvent(new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 0 }));
+      for (let i = 0; i < 8; i++) {
+        await new Promise((done) => setTimeout(done, 24));
+        window.dispatchEvent(
+          new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 22 }),
+        );
+      }
+    });
+    await expect.poll(() => tiltSteering).toBe(true);
+    await phone.getByRole("button", { name: "Usar táctil" }).click();
+
     await phone.getByLabel("Lado de los pedales").selectOption("left");
     await phone.getByLabel("Vibración", { exact: true }).check();
     await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
     await expect(phone.locator("#drive-shell")).toHaveAttribute("data-side", "left");
+    await phone.setViewportSize({ width: 844, height: 390 });
+    expect(
+      await phone.locator(".handset-input button").evaluateAll((buttons) =>
+        buttons.every((button) => {
+          const box = button.getBoundingClientRect();
+          return (
+            box.width >= 48 &&
+            box.height >= 48 &&
+            box.right <= innerWidth &&
+            box.bottom <= innerHeight
+          );
+        }),
+      ),
+    ).toBe(true);
+    await phone.setViewportSize({ width: 390, height: 844 });
 
     const start = page.getByRole("button", { name: "Jugar con móvil" });
     await expect(start).toBeEnabled({ timeout: 20000 });
