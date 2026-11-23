@@ -1,11 +1,4 @@
-import {
-  createRace,
-  driving,
-  FixedClock,
-  neutralInput,
-  stepRace,
-  TICK_HZ,
-} from "@qracer/game-core";
+import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { featureFlags } from "../features.ts";
 import "../styles.css";
@@ -107,8 +100,8 @@ function updateHud() {
   speed.textContent = String(Math.round(state.driver.speed * 3.6));
   distance.textContent = `${Math.floor(state.driver.s)} m`;
   score.textContent = String(state.score);
-  integrity.textContent = `Integridad ${state.driver.integrity}/${driving.integrity}`;
-  nitro.value = state.driver.nitro / driving.nitroSeconds;
+  integrity.textContent = `Integridad ${state.driver.integrity}/${state.config.integrity}`;
+  nitro.value = state.config.nitroSeconds > 0 ? state.driver.nitro / state.config.nitroSeconds : 0;
   message.textContent =
     state.phase === "countdown"
       ? String(Math.ceil(state.countdown / TICK_HZ))

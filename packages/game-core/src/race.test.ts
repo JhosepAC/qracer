@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { sweptClearance } from "./collision.ts";
 import {
   createRace,
+  driving,
   FixedClock,
   laneCenters,
   neutralInput,
@@ -100,4 +101,13 @@ it("replays a full seeded race at 30/60/120 Hz and resets after suspension", () 
   const reference = replay(60);
   expect(replay(30)).toEqual(reference);
   expect(replay(120)).toEqual(reference);
+});
+
+it("uses the selected balance throughout a race", () => {
+  const base = createRace(310, { ...driving, integrity: 1, nitroSeconds: 1, maximum: 27 });
+  let state: Race = { ...base, phase: "racing" };
+  expect(state.driver.integrity).toBe(1);
+  expect(state.driver.nitro).toBe(1);
+  for (let i = 0; i < 180; i++) state = stepRace(state, { ...neutralInput, throttle: 1 });
+  expect(state.driver.speed).toBe(27);
 });

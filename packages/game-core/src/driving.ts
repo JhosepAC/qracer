@@ -17,7 +17,23 @@ export const neutralInput: DriveInput = Object.freeze({
   boost: false,
 });
 
-export const driving = Object.freeze({
+export interface DrivingConfig {
+  readonly cruise: number;
+  readonly minimum: number;
+  readonly maximum: number;
+  readonly boostMaximum: number;
+  readonly acceleration: number;
+  readonly brakeRate: number;
+  readonly coastRate: number;
+  readonly lateralSpeed: number;
+  readonly lateralAcceleration: number;
+  readonly playerHalfWidth: number;
+  readonly integrity: number;
+  readonly nitroSeconds: number;
+  readonly rechargePerSecond: number;
+}
+
+export const driving: DrivingConfig = Object.freeze({
   cruise: 80 / 3.6,
   minimum: 50 / 3.6,
   maximum: 180 / 3.6,
