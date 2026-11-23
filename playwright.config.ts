@@ -14,7 +14,11 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev:local",
     url: "http://127.0.0.1:4173/health",
-    env: { QRACER_PORT: "4173", QRACER_HOST: "127.0.0.1" },
+    env: {
+      QRACER_PORT: "4173",
+      QRACER_HOST: "127.0.0.1",
+      QRACER_ALLOWED_ORIGINS: "http://127.0.0.1:4173,http://localhost:4173,http://qracer.test:4173",
+    },
     reuseExistingServer: false,
     timeout: 30000,
   },
