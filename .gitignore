@@ -1,0 +1,85 @@
+# Local product planning (intentionally not published)
+/docs/
+
+# Dependencies and package-manager caches (keep lockfiles)
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/cache/
+.pnp.*
+
+# Compiled assets, local distributions and caches
+dist/
+build/
+artifacts/
+.cache/
+.vite/
+.turbo/
+*.tsbuildinfo
+
+# Tests, coverage, recordings and profiling
+coverage/
+playwright-report/
+test-results/
+blob-report/
+*.lcov
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.local
+
+# Cloudflare emulation, local indexes and tool output
+.wrangler/
+.codegraph/
+.agents/.cache/
+.codex/
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editors and IDEs
+.vscode/
+.idea/
+.vs/
+.fleet/
+.zed/
+.history/
+*.code-workspace
+*.iml
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*~
+
+# OS metadata and temporary files
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.temp
+*.bak
+
+# Blender automatic backups; editable .blend sources stay versionable
+*.blend1
+*.blend2
+*.blend@
