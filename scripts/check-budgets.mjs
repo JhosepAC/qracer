@@ -38,11 +38,13 @@ export async function checkBudgets(directory) {
   for (const [entry, limit] of [
     ["play/index.html", 600 * 1024],
     ["controller/index.html", 120 * 1024],
+    ["probe/index.html", 600 * 1024],
+    ["probe/controller/index.html", 120 * 1024],
   ]) {
     let compressed = 0;
     for (const file of reachableFiles(manifest, entry)) {
       compressed += gzipSync(await readFile(join(directory, file))).byteLength;
-      if (entry.startsWith("controller") && report[file]?.modules.some(forbiddenControllerModule)) {
+      if (entry.includes("controller") && report[file]?.modules.some(forbiddenControllerModule)) {
         throw new Error(`Renderer code leaked into the controller: ${file}`);
       }
     }
