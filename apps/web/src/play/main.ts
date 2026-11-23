@@ -7,6 +7,7 @@ import "../styles.css";
 import "../session/pair.css";
 import "./race.css";
 import type { createRaceView } from "./race-view.ts";
+import { isQuality, loadQuality, saveQuality } from "./quality.ts";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing application root");
@@ -27,8 +28,16 @@ root.innerHTML = `
       <dl><div><dt>Dirección</dt><dd><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dd></div>
       <div><dt>Acelera / frena</dt><dd><kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
       <div><dt>Nitro</dt><dd><kbd>Shift</kbd></dd></div></dl>
+      <label class="race-quality" for="graphics-quality">Gráficos
+        <select id="graphics-quality">
+          <option value="low">Bajo</option>
+          <option value="balanced">Equilibrado</option>
+          <option value="high">Alto</option>
+        </select>
+      </label>
       <button class="button primary" type="button" id="start" disabled>Salir a pista</button>
       <p id="graphics-status" role="status">Cargando circuito…</p>
+      <progress id="graphics-progress" max="6" value="0" aria-label="Carga del circuito"></progress>
       <button type="button" id="host-pair" class="button pair-trigger" hidden>Conectar móvil</button>
       <button class="button primary" type="button" id="start-mobile" hidden disabled>Jugar con móvil</button>
       <p id="drive-link" class="fine-print" hidden></p>
@@ -78,6 +87,9 @@ const restart = element<HTMLButtonElement>("restart");
 const hud = element("hud");
 const message = element("message");
 const status = element("graphics-status");
+const progress = element<HTMLProgressElement>("graphics-progress");
+const quality = element<HTMLSelectElement>("graphics-quality");
+quality.value = loadQuality();
 const score = element("score");
 const distance = element("distance");
 const speed = element("speed");
@@ -318,8 +330,18 @@ window.setInterval(() => {
 }, 25);
 
 async function mount() {
+  loading?.abort();
   const attempt = new AbortController();
   loading = attempt;
+  const previous = view;
+  view = undefined;
+  previous?.dispose();
+  start.disabled = startMobile.disabled = resume.disabled = restart.disabled = true;
+  preview.dataset.graphics = "loading";
+  progress.hidden = false;
+  progress.value = 0;
+  status.textContent = "Cargando circuito…";
+  const selected = isQuality(quality.value) ? quality.value : "balanced";
   let timedOut = false;
   const deadline = window.setTimeout(() => {
     timedOut = true;
@@ -328,7 +350,16 @@ async function mount() {
   try {
     const { createRaceView } = await import("./race-view.ts");
     attempt.signal.throwIfAborted();
-    const scene = await createRaceView(preview, attempt.signal);
+    progress.value = 1;
+    status.textContent = "Descargando modelos";
+    const scene = await createRaceView(preview, attempt.signal, {
+      quality: selected,
+      progress(completed, label) {
+        if (loading !== attempt) return;
+        progress.value = completed;
+        status.textContent = label;
+      },
+    });
     if (attempt.signal.aborted) {
       scene.dispose();
       attempt.signal.throwIfAborted();
@@ -336,6 +367,7 @@ async function mount() {
     view = scene;
     contextLost = false;
     scene.canvas.addEventListener("webglcontextlost", (event) => {
+      if (view !== scene) return;
       event.preventDefault();
       contextLost = true;
       start.disabled = true;
@@ -344,19 +376,22 @@ async function mount() {
       status.textContent = "Se perdió el contexto gráfico.";
     });
     scene.canvas.addEventListener("webglcontextrestored", () => {
-      contextLost = false;
-      start.disabled = resume.disabled = restart.disabled = false;
-      status.textContent = "";
-      scene.draw(clock.current, clock.current, 0);
+      if (view !== scene) return;
+      void mount();
     });
     scene.draw(clock.current, clock.current, 0);
     preview.dataset.graphics = "ready";
+    preview.dataset.quality = selected;
+    preview.dataset.renderStats = JSON.stringify(scene.stats());
+    progress.hidden = true;
     start.disabled = resume.disabled = restart.disabled = false;
     status.textContent = "";
   } catch (error) {
     if (loading !== attempt || (attempt.signal.aborted && !timedOut)) return;
     view?.dispose();
     view = undefined;
+    preview.dataset.graphics = "failed";
+    progress.hidden = true;
     status.textContent = timedOut
       ? "El circuito tardó demasiado en cargar. Recarga para reintentar."
       : error instanceof Error && error.message.startsWith("Activa WebGL 2")
@@ -364,9 +399,15 @@ async function mount() {
         : "No se pudo cargar el circuito. Recarga para reintentar.";
   } finally {
     window.clearTimeout(deadline);
+    if (loading === attempt) loading = undefined;
   }
 }
 
+quality.onchange = () => {
+  if (!isQuality(quality.value)) return;
+  saveQuality(quality.value);
+  void mount();
+};
 start.onclick = () => {
   source = "keyboard";
   run(true);

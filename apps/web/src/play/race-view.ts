@@ -1,5 +1,6 @@
 import {
   arc,
+  createRace,
   firstSegment,
   MAX_TRAFFIC,
   type Race,
@@ -9,17 +10,21 @@ import {
   roadPose,
   SEGMENT_LENGTH,
   segmentCurvature,
+  TICK_HZ,
   trafficPosition,
 } from "@qracer/game-core";
 import {
   ACESFilmicToneMapping,
   CircleGeometry,
   Color,
+  DataTexture,
   DirectionalLight,
+  Float32BufferAttribute,
   FogExp2,
   Group,
   HemisphereLight,
   InstancedMesh,
+  LinearFilter,
   type Material,
   Mesh,
   MeshBasicMaterial,
@@ -27,15 +32,48 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
+  RGBAFormat,
   Scene,
   Texture,
+  type WebGLRenderTarget,
   WebGLRenderer,
 } from "three";
 import { assetRoot, materialParts } from "../graphics/batching.ts";
+import { coastalEffects } from "./coastal-effects.ts";
+import {
+  coastalReflections,
+  coastalSky,
+  coastalWater,
+  horizon,
+  sunDirection,
+} from "./coastal-light.ts";
+import { qualities, type Quality } from "./quality.ts";
 import { raceAssetLoader } from "./race-assets.ts";
 
 const colors = [0x469baf, 0xd06b56, 0xbfc8d8, 0x69759e].map((value) => new Color(value));
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
+export interface RaceViewOptions {
+  quality?: Quality;
+  progress?: (completed: number, label: string) => void;
+}
+
+function terrainHeight(lateral: number) {
+  return -0.19 + 4.5 * Math.min(1, Math.max(0, -lateral - 10) / 50) ** 1.65;
+}
+
+function shadowTexture() {
+  const size = 48;
+  const pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const radius = Math.hypot((x + 0.5) / size - 0.5, (y + 0.5) / size - 0.5) * 2;
+      pixels[(y * size + x) * 4 + 1] = Math.round(255 * (1 - Math.min(1, radius)) ** 0.7);
+    }
+  const texture = new DataTexture(pixels, size, size, RGBAFormat);
+  texture.minFilter = texture.magFilter = LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
 
 function disposeObjects(roots: Object3D[]) {
   const geometries = new Set<Mesh["geometry"]>();
@@ -55,21 +93,29 @@ function disposeObjects(roots: Object3D[]) {
   for (const resource of [...geometries, ...materials, ...textures]) resource.dispose();
 }
 
-export async function createRaceView(container: HTMLElement, signal: AbortSignal) {
+export async function createRaceView(
+  container: HTMLElement,
+  signal: AbortSignal,
+  { quality = "balanced", progress }: RaceViewOptions = {},
+) {
+  const profile = qualities[quality];
   const scene = new Scene();
   const roots: Object3D[] = [scene];
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("webgl2", {
-    alpha: true,
-    antialias: true,
+    alpha: false,
+    antialias: quality !== "low",
     powerPreference: "high-performance",
   });
   if (!context) throw new Error("Activa WebGL 2 y recarga para abrir el circuito.");
-  const renderer = new WebGLRenderer({ canvas, context, alpha: true, antialias: true });
+  const renderer = new WebGLRenderer({ canvas, context });
   const camera = new PerspectiveCamera(52, 1, 0.2, 490);
   const pose = { x: 0, z: 0, heading: 0 };
   const dummy = new Object3D();
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const effects = coastalEffects(profile.particles);
+  const sunlight = new DirectionalLight(0xffca9a, 3.6);
+  let reflections: WebGLRenderTarget | undefined;
   let observer: ResizeObserver | undefined;
   let disposed = false;
 
@@ -77,9 +123,13 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     if (disposed) return;
     disposed = true;
     observer?.disconnect();
+    effects.dispose();
+    sunlight.shadow.dispose();
+    reflections?.dispose();
     disposeObjects(roots);
     renderer.dispose();
     renderer.domElement.remove();
+    renderer.forceContextLoss();
   };
 
   function batch(model: Object3D, count: number): Batch {
@@ -113,16 +163,41 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
   }
 
   try {
+    renderer.info.autoReset = false;
     renderer.toneMapping = ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.24;
-    scene.fog = new FogExp2(0xe3a880, 0.0055);
-    scene.add(new HemisphereLight(0xf4ddc5, 0x294a60, 2.5));
-    const sunlight = new DirectionalLight(0xffd397, 3.2);
-    sunlight.position.set(-40, 21, -28);
-    scene.add(sunlight);
+    renderer.toneMappingExposure = 1.08;
+    scene.fog = new FogExp2(horizon, 0.0054);
+    scene.add(
+      new HemisphereLight(0xffddc3, 0x527785, 2.36),
+      sunlight,
+      sunlight.target,
+      effects.mesh,
+    );
+    if (profile.shadow) {
+      renderer.shadowMap.enabled = true;
+      sunlight.castShadow = true;
+      sunlight.shadow.mapSize.set(profile.shadow, profile.shadow);
+      Object.assign(sunlight.shadow.camera, {
+        left: -12,
+        right: 12,
+        top: 12,
+        bottom: -12,
+        near: 1,
+        far: 75,
+      });
+      sunlight.shadow.camera.updateProjectionMatrix();
+      sunlight.shadow.bias = -0.0004;
+      sunlight.shadow.normalBias = 0.045;
+      sunlight.shadow.intensity = 0.7;
+      reflections = coastalReflections(renderer);
+      scene.environment = reflections.texture;
+      scene.environmentIntensity = 0.55;
+    }
+    const sky = coastalSky();
+    scene.add(sky);
 
     const loader = raceAssetLoader(renderer);
-    async function load(name: string) {
+    async function load(name: string, completed: number) {
       const response = await fetch(`/assets/coast/${name}.glb`, {
         signal,
       });
@@ -132,17 +207,19 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
       const asset = await loader.models.parseAsync(glb, "");
       roots.push(asset.scene);
       signal.throwIfAborted();
+      progress?.(completed, "Preparando modelos");
       return asset.scene;
     }
 
     const [car, coast, props] = await (async () => {
       try {
-        return [await load("coupe"), await load("coast"), await load("props")] as const;
+        return [await load("coupe", 2), await load("coast", 3), await load("props", 4)] as const;
       } finally {
         loader.dispose();
       }
     })();
-    const hero = batch(assetRoot(car, "qracer_lod", 0), 1);
+    const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1);
+    if (profile.shadow) for (const part of hero) part.castShadow = true;
     const traffic = batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC);
     const palms = batch(assetRoot(coast, "qracer_asset", "palm"), 16);
     const cliffs = batch(assetRoot(coast, "qracer_asset", "cliff"), 5);
@@ -172,9 +249,25 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
     const position = surface.getAttribute("position");
     for (let i = 0; i < uv.count; i++) uv.setXY(i, position.getX(i) / 4, -position.getZ(i) / 4);
     tile.add(new Mesh(surface, asphalt));
-    const ground = new PlaneGeometry(44, SEGMENT_LENGTH, 1, 12).rotateX(-Math.PI / 2);
-    ground.translate(-14, -0.19, 0);
-    tile.add(new Mesh(ground, new MeshStandardMaterial({ color: 0x536249, roughness: 1 })));
+    const ground = new PlaneGeometry(72, SEGMENT_LENGTH, 18, 12).rotateX(-Math.PI / 2);
+    ground.translate(-28, 0, 0);
+    const groundPoints = ground.getAttribute("position");
+    const groundColors = ground.getAttribute("uv");
+    const sage = new Color(0x6d7962);
+    const limestone = new Color(0xa68c6c);
+    const tint = new Color();
+    const groundPalette = new Float32Array(groundPoints.count * 3);
+    for (let i = 0; i < groundPoints.count; i++) {
+      const x = groundPoints.getX(i);
+      const wave = Math.cos(groundColors.getY(i) * Math.PI * 2);
+      groundPoints.setY(i, terrainHeight(x));
+      const stone = 0.26 + 0.18 * Math.sin(x * 0.63 + 0.7 * wave) + 0.13 * wave;
+      tint.copy(sage).lerp(limestone, stone);
+      tint.toArray(groundPalette, i * 3);
+    }
+    ground.setAttribute("color", new Float32BufferAttribute(groundPalette, 3));
+    ground.computeVertexNormals();
+    tile.add(new Mesh(ground, new MeshStandardMaterial({ vertexColors: true, roughness: 1 })));
     const seawall = assetRoot(props, "qracer_asset", "seawall").clone();
     seawall.position.set(8.8, -0.19, 0);
     tile.add(seawall);
@@ -192,6 +285,7 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
       const curve = segmentCurvature(index);
       const meshes = batch(tile, ROAD_SEGMENTS);
       for (const mesh of meshes) {
+        mesh.receiveShadow = Boolean(profile.shadow) && mesh.material === asphalt;
         const points = mesh.geometry.getAttribute("position");
         const normals = mesh.geometry.getAttribute("normal");
         const center = { x: 0, z: 0, heading: 0 };
@@ -217,18 +311,16 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
         new MeshBasicMaterial({
           color: 0x142123,
           transparent: true,
-          opacity: 0.44,
+          opacity: 0.74,
+          alphaMap: shadowTexture(),
           depthWrite: false,
         }),
       ),
     );
     roots.push(shadowModel);
     const shadows = batch(shadowModel, MAX_TRAFFIC + 1);
-    const ocean = new Mesh(
-      new PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2),
-      new MeshStandardMaterial({ color: 0x386b75, roughness: 0.47, metalness: 0.2 }),
-    );
-    scene.add(ocean);
+    const ocean = coastalWater(quality !== "low");
+    scene.add(ocean.mesh);
     const moving = [hero, traffic, shadows, ...Object.values(hazards)].flat();
     const environment = [...roads.values(), palms, cliffs, towers, villas, lamps].flat();
     let lastSegment = Number.NaN;
@@ -260,30 +352,34 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
               0.85 + (decor % 4) * 0.12,
             );
           if (i % 2 === 0) addPose(lamps, roadPose(start + 6, 7.6, origin, pose), -0.14);
-          if (i % 3 === 1)
+          if (i % 3 === 1) {
+            const hillside = -15.4 - (decor % 3) * 1.5;
             addPose(
               villas,
-              roadPose(start + 8, -15.4 - (decor % 3) * 1.5, origin, pose),
-              -0.17,
+              roadPose(start + 8, hillside, origin, pose),
+              terrainHeight(hillside) - 0.16,
               (decor % 10) * 0.07 - 0.35,
               0.9 + (decor % 3) * 0.14,
             );
+          }
           if (i % 4 === 0)
             addPose(cliffs, roadPose(start + 12, -20, origin, pose), -1.1, decor % 7, 1.35);
-          if (i % 4 === 2)
+          if (i % 4 === 2 && (quality !== "low" || i - first < 11))
             addPose(
               towers,
               roadPose(start + 12, -29, origin, pose),
-              -0.22,
+              terrainHeight(-29) - 0.45,
               0,
               0.8 + (decor % 3) * 0.24,
             );
         }
         for (const mesh of environment) mesh.instanceMatrix.needsUpdate = true;
-        ocean.position.set(0, -1.4, -130);
+        ocean.mesh.position.set(0, -1.4, -130);
       }
       for (const mesh of moving) mesh.count = 0;
       roadPose(distance, lateral, origin, pose);
+      sunlight.target.position.set(pose.x, 0, pose.z);
+      sunlight.position.copy(sunlight.target.position).addScaledVector(sunDirection, 36);
       addPose(
         hero,
         pose,
@@ -296,7 +392,7 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
       const tick = previous.tick + (current.tick - previous.tick) * alpha;
       for (const row of current.traffic.rows) {
         const s = trafficPosition(row, Math.max(tick, row.tick));
-        if (s - distance > 232 || distance - s > 18) continue;
+        if (s - distance > profile.trafficRange || distance - s > 18) continue;
         for (const vehicle of row.cars) {
           roadPose(s, vehicle.d, origin, pose);
           if (row.hazard) {
@@ -311,17 +407,31 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
-      roadPose(distance - 9.5, lateral * 0.57, origin, pose);
-      camera.position.set(pose.x, 4.45, pose.z);
-      roadPose(distance + 23, lateral * 0.15, origin, pose);
-      camera.lookAt(pose.x, 0.35, pose.z);
+      const reduced = reducedMotion.matches;
+      const pace = p.speed + (c.speed - p.speed) * alpha;
+      const fast = reduced ? 0 : Math.max(0, pace - 18) / 35;
+      roadPose(distance - 7.1 - fast * 0.72, lateral * 0.69, origin, pose);
+      camera.position.set(pose.x, 3.12 + fast * 0.21, pose.z);
+      roadPose(distance + 22, lateral * 0.2, origin, pose);
+      camera.lookAt(pose.x, 0.41, pose.z);
+      const fov = 49 + fast * 3.8;
+      if (Math.abs(camera.fov - fov) >= 0.08) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+      sky.position.copy(camera.position);
+      ocean.update(reduced ? 0 : tick / TICK_HZ, origin * SEGMENT_LENGTH);
+      effects.update(current, tick, origin, reduced);
+      renderer.info.reset();
       renderer.render(scene, camera);
     }
 
     function resize() {
       const w = Math.max(container.clientWidth, 1);
       const h = Math.max(container.clientHeight, 1);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 1, 1280 / w, 720 / h));
+      renderer.setPixelRatio(
+        Math.min(devicePixelRatio, profile.dpr, profile.width / w, profile.height / h),
+      );
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -329,8 +439,12 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
 
     container.append(renderer.domElement);
     resize();
+    progress?.(5, "Precalentando gráficos");
     await renderer.compileAsync(scene, camera);
     signal.throwIfAborted();
+    const initial = createRace();
+    draw(initial, initial, 0);
+    progress?.(6, "Circuito listo");
     observer = new ResizeObserver(() => {
       resize();
       if (lastPrevious && lastCurrent) draw(lastPrevious, lastCurrent, lastAlpha);
