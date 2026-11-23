@@ -1,0 +1,23 @@
+{
+  "scene": "QRacer_F02_Coast_r2",
+  "license": "MIT",
+  "bytes": 1894744,
+  "assets": {
+    "road": {
+      "objects": 45,
+      "triangles": 540
+    },
+    "palm": {
+      "objects": 2,
+      "triangles": 1042
+    },
+    "cliff": {
+      "objects": 1,
+      "triangles": 3196
+    },
+    "tower": {
+      "objects": 195,
+      "triangles": 2340
+    }
+  }
+}
