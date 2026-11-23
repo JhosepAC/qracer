@@ -12,6 +12,8 @@ export default defineConfig({
         home: fileURLToPath(new URL("./index.html", import.meta.url)),
         play: fileURLToPath(new URL("./play/index.html", import.meta.url)),
         controller: fileURLToPath(new URL("./controller/index.html", import.meta.url)),
+        probe: fileURLToPath(new URL("./probe/index.html", import.meta.url)),
+        probeController: fileURLToPath(new URL("./probe/controller/index.html", import.meta.url)),
       },
     },
   },
