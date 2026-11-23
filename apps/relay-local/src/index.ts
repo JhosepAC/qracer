@@ -5,6 +5,7 @@ const port = Number(process.env.QRACER_PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid QRACER_PORT");
 const host = process.env.QRACER_HOST ?? "127.0.0.1";
 const relay = createRelay({
+  ...(process.env.QRACER_PROBE_KEY ? { probeKey: process.env.QRACER_PROBE_KEY } : {}),
   staticDir: fileURLToPath(new URL("../../web/dist/", import.meta.url)),
   allowedOrigins: (
     process.env.QRACER_ALLOWED_ORIGINS ??
