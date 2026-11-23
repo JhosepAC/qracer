@@ -85,3 +85,31 @@ test("denied sensors and unavailable RTC preserve tactile control", async ({ pag
   await expect(page.locator("#metrics")).not.toContainText("RTT —", { timeout: 4000 });
   await context.close();
 });
+
+test("stops input snapshots when the PC leaves so the empty room can hibernate", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/probe/");
+  await page.getByRole("button", { name: "Crear enlace" }).click();
+  const invite = page.getByRole("link", { name: "Abrir mando de prueba" });
+  await expect(invite).toBeVisible();
+  const url = await invite.getAttribute("href");
+  const context = await browser.newContext();
+  const mobile = await context.newPage();
+  let inputs = 0;
+  mobile.on("websocket", (socket) =>
+    socket.on("framesent", (event) => {
+      if (JSON.parse(String(event.payload)).type === "INPUT") inputs++;
+    }),
+  );
+  await mobile.goto(url ?? "");
+  await expect(mobile.locator("#status")).toHaveText("Conectado · WSS");
+  await expect.poll(() => inputs).toBeGreaterThan(2);
+  await page.close();
+  await expect(mobile.locator("#status")).toHaveText("Esperando a la PC");
+  const stopped = inputs;
+  await mobile.waitForTimeout(350);
+  expect(inputs).toBe(stopped);
+  await context.close();
+});
