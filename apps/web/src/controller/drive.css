@@ -161,3 +161,19 @@ body:has(.handset:not([hidden])) #controller-title {
 .mobile-feedback[hidden] {
   display: none;
 }
+body:has(.handset:not([hidden])) .topbar {
+  padding-block: 0.65rem;
+}
+body:has(.handset:not([hidden])) .controller-shell {
+  padding-block: 0.65rem;
+}
+body:has(.handset:not([hidden])) .controller-shell .panel {
+  padding: 1rem clamp(0.75rem, 3vw, 1.5rem);
+}
+body:has(.handset:not([hidden])) #controller-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

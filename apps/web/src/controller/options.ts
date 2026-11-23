@@ -221,8 +221,13 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
       flashTimer = window.setTimeout(() => {
         flash.hidden = true;
       }, 650);
-      if (vibration.checked && typeof navigator.vibrate === "function")
-        navigator.vibrate(feedbackPulse[frame.kind]);
+      if (vibration.checked && typeof navigator.vibrate === "function") {
+        try {
+          navigator.vibrate(feedbackPulse[frame.kind]);
+        } catch {
+          /* Visual feedback remains available. */
+        }
+      }
     },
   };
 }
