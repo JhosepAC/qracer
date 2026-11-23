@@ -132,8 +132,8 @@ export async function createRaceView(
     renderer.forceContextLoss();
   };
 
-  function batch(model: Object3D, count: number): Batch {
-    return materialParts(model).map(({ geometry, material }) => {
+  function batch(model: Object3D, count: number, modelSpace?: Object3D): Batch {
+    return materialParts(model, modelSpace).map(({ geometry, material }) => {
       const mesh = new InstancedMesh(geometry, material, count);
       mesh.count = 0;
       mesh.frustumCulled = false;
@@ -218,9 +218,11 @@ export async function createRaceView(
         loader.dispose();
       }
     })();
-    const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1);
+    // Meshopt places each coupe LOD's decode transform on its tagged root.
+    // The GLB scene owns the original pivot at wheel height, used by all instances.
+    const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1, car);
     if (profile.shadow) for (const part of hero) part.castShadow = true;
-    const traffic = batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC);
+    const traffic = batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC, car);
     const palms = batch(assetRoot(coast, "qracer_asset", "palm"), 16);
     const cliffs = batch(assetRoot(coast, "qracer_asset", "cliff"), 5);
     const towers = batch(assetRoot(coast, "qracer_asset", "tower"), 5);
