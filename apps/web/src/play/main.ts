@@ -1,11 +1,4 @@
-import {
-  createRace,
-  driving,
-  FixedClock,
-  neutralInput,
-  stepRace,
-  TICK_HZ,
-} from "@qracer/game-core";
+import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { featureFlags } from "../features.ts";
 import "../styles.css";
@@ -107,8 +100,8 @@ function updateHud() {
   speed.textContent = String(Math.round(state.driver.speed * 3.6));
   distance.textContent = `${Math.floor(state.driver.s)} m`;
   score.textContent = String(state.score);
-  integrity.textContent = `Integridad ${state.driver.integrity}/${driving.integrity}`;
-  nitro.value = state.driver.nitro / driving.nitroSeconds;
+  integrity.textContent = `Integridad ${state.driver.integrity}/${state.config.integrity}`;
+  nitro.value = state.config.nitroSeconds > 0 ? state.driver.nitro / state.config.nitroSeconds : 0;
   message.textContent =
     state.phase === "countdown"
       ? String(Math.ceil(state.countdown / TICK_HZ))
@@ -173,11 +166,19 @@ function run(reset: boolean) {
 async function mount() {
   const attempt = new AbortController();
   loading = attempt;
+  let timedOut = false;
+  const deadline = window.setTimeout(() => {
+    timedOut = true;
+    attempt.abort();
+  }, 15000);
   try {
     const { createRaceView } = await import("./race-view.ts");
     attempt.signal.throwIfAborted();
     const scene = await createRaceView(preview, attempt.signal);
-    if (attempt.signal.aborted) return scene.dispose();
+    if (attempt.signal.aborted) {
+      scene.dispose();
+      attempt.signal.throwIfAborted();
+    }
     view = scene;
     contextLost = false;
     scene.canvas.addEventListener("webglcontextlost", (event) => {
@@ -198,11 +199,17 @@ async function mount() {
     preview.dataset.graphics = "ready";
     start.disabled = resume.disabled = restart.disabled = false;
     status.textContent = "";
-  } catch {
-    if (attempt.signal.aborted) return;
+  } catch (error) {
+    if (loading !== attempt || (attempt.signal.aborted && !timedOut)) return;
     view?.dispose();
     view = undefined;
-    status.textContent = "Activa WebGL 2 y recarga para abrir el circuito.";
+    status.textContent = timedOut
+      ? "El circuito tardó demasiado en cargar. Recarga para reintentar."
+      : error instanceof Error && error.message.startsWith("Activa WebGL 2")
+        ? error.message
+        : "No se pudo cargar el circuito. Recarga para reintentar.";
+  } finally {
+    window.clearTimeout(deadline);
   }
 }
 
@@ -230,6 +237,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!clock.paused) stop();
   loading?.abort();
+  loading = undefined;
   view?.dispose();
   view = undefined;
   delete preview.dataset.graphics;

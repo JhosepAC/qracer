@@ -1,5 +1,13 @@
 import { CAR_HALF_LENGTH, contactFor, sweptClearance } from "./collision.ts";
-import { type DriveInput, type Driver, drive, driving, initialDriver, TICK_HZ } from "./driving.ts";
+import {
+  type DriveInput,
+  type Driver,
+  type DrivingConfig,
+  drive,
+  driving,
+  initialDriver,
+  TICK_HZ,
+} from "./driving.ts";
 import { advanceTraffic, emptyTraffic, type Traffic, trafficPosition } from "./traffic.ts";
 
 const COUNTDOWN = 3 * TICK_HZ;
@@ -18,6 +26,7 @@ export interface Race {
   readonly countdown: number;
   readonly tick: number;
   readonly seed: number;
+  readonly config: DrivingConfig;
   readonly driver: Driver;
   readonly traffic: Traffic;
   readonly encounters: ReadonlyMap<number, Encounter>;
@@ -34,13 +43,14 @@ export interface Race {
 
 const noEvents: readonly RaceEvent[] = [];
 
-export function createRace(seed: number = 310): Race {
-  const driver = initialDriver();
+export function createRace(seed: number = 310, config: DrivingConfig = driving): Race {
+  const driver = initialDriver(config);
   return {
     phase: "countdown",
     countdown: COUNTDOWN,
     tick: 0,
     seed: seed | 0,
+    config: Object.freeze({ ...config }),
     driver,
     traffic: advanceTraffic(emptyTraffic, seed, 0, 0),
     encounters: new Map(),
@@ -64,7 +74,8 @@ export function stepRace(state: Race, input: DriveInput): Race {
   }
   const tick = state.tick + 1;
   const before = state.driver;
-  const motion = drive(before, input, driving, tick >= state.protectedUntil);
+  const config = state.config;
+  const motion = drive(before, input, config, tick >= state.protectedUntil);
   let { integrity, speed } = motion;
   let { protectedUntil, bonus, overtakes, nearMisses, comboUntil } = state;
   let combo = tick >= comboUntil ? 1 : state.combo;
@@ -87,20 +98,20 @@ export function stepRace(state: Race, input: DriveInput): Race {
       const seen = state.encounters.get(car.id);
       if (seen === "passed") continue;
       const clearance = sweptClearance(oldS, newS, before.d - car.d, motion.d - car.d);
-      const contact = contactFor(clearance, driving.playerHalfWidth);
+      const contact = contactFor(clearance, config.playerHalfWidth);
       if (contact === "impact" && seen !== "contact") {
         remember(car.id, "contact");
         if (integrity > 0 && tick >= protectedUntil) {
           integrity--;
           protectedUntil = tick + PROTECTION;
-          speed = Math.max(driving.minimum, speed * 0.62);
+          speed = Math.max(config.minimum, speed * 0.62);
           combo = 1;
           comboUntil = 0;
           emit("impact", car.id);
         }
       } else if (contact === "graze" && seen !== "contact" && seen !== "graze") {
         remember(car.id, "graze");
-        speed = Math.max(driving.minimum, speed * 0.92);
+        speed = Math.max(config.minimum, speed * 0.92);
         emit("graze", car.id);
       } else if (contact === "near" && !seen) {
         remember(car.id, "near");

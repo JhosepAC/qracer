@@ -60,3 +60,15 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
   await expect(page.locator("#score")).toHaveText("0");
   expect(errors).toEqual([]);
 });
+
+test("keeps race controls disabled when a model fails and recovers on reload", async ({ page }) => {
+  await page.route("**/assets/probe/coupe.glb", (route) => route.abort());
+  await page.goto("/play/");
+  await expect(page.getByRole("status")).toContainText("No se pudo cargar el circuito");
+  await expect(page.getByRole("button", { name: "Salir a pista" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "Conocer el mando" })).toBeVisible();
+  await page.unroute("**/assets/probe/coupe.glb");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Salir a pista" })).toBeEnabled();
+  await expect(page.locator("#preview canvas")).toHaveCount(1);
+});

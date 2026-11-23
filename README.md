@@ -2,9 +2,9 @@
 
 Juego arcade 3D para navegador de PC, controlado desde un teléfono mediante un código QR. El mando web funciona sin instalar una aplicación; gráficos, conexión y controles cuentan con alternativas según las capacidades del dispositivo.
 
-**Estado:** F01 integrada; F02 en validación con QR, controles táctiles/sensores,
-relay local/Free y escena 3D de estrés. Es un laboratorio de viabilidad, previo
-al juego completo. Instrucciones reproducibles en [PROBES.md](PROBES.md).
+**Estado:** F03 entrega una carrera costera jugable con teclado en PC. El
+laboratorio F02 de QR, sensores, relay y rendimiento sigue en validación.
+Instrucciones del laboratorio en [PROBES.md](PROBES.md).
 
 - [Instrucciones para agentes](AGENTS.md)
 
@@ -21,8 +21,14 @@ pnpm dev
 
 Abrir [PC](http://127.0.0.1:5173/play/) o [mando](http://127.0.0.1:5173/controller/).
 Son aplicaciones independientes: el renderer se carga únicamente en PC.
-`/play/` y `/controller/` conservan el esqueleto de F01; las pruebas implementadas
-de QR, sensores y movimiento están en `/probe/` y `/probe/controller/`.
+En `/play/`, espera a que se cargue la escena WebGL 2 y elige **Salir a pista**.
+Usa **A/D** o **←/→** para girar, **W/↑** para acelerar, **S/↓** para frenar,
+**Shift** para activar nitro y **Esc** para pausar. La carrera comienza con
+una cuenta atrás y termina al agotar la integridad. Puedes reiniciar desde
+la pausa o los resultados.
+
+Las pruebas de QR, sensores y movimiento con el teléfono se abren en
+`/probe/` y `/probe/controller/`.
 
 ## Relay y distribución local
 
@@ -31,7 +37,7 @@ pnpm build
 pnpm dev:local
 ```
 
-Abrir `http://127.0.0.1:3000/probe/` para F02. El relay sirve las aplicaciones,
+Abrir `http://127.0.0.1:3000/play/` para jugar y `/probe/` para F02. El relay sirve las aplicaciones,
 `/health`, el bootstrap `/ws` y las sesiones aisladas `/probe/session`/`/probe/ws/…`.
 La vinculación definitiva y la política de reconexión pertenecen a F04.
 
