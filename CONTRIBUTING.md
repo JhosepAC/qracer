@@ -16,6 +16,13 @@ Las versiones están fijadas; no regenerar dependencias con `latest`.
 - Hacer varios commits coherentes con Conventional Commits; evitar un único commit gigante.
 - Revisar diff, checks y evidencia antes de integrar mediante squash; no forzar `main`.
 
+Los incrementos dependientes pueden revisarse como PR apilados. Cada uno apunta a su
+predecesor para conservar el límite de archivos. Tras integrar un padre por squash,
+rebasar únicamente los commits propios del hijo sobre `origin/main`, actualizar su base
+y volver a comprobar el diff antes de integrar. Aplicar el mismo procedimiento a los
+descendientes. No retargetear toda la pila a `main` sin rebasarla: mostraría cambios ya
+integrados. Una actualización reescrita solo usa `--force-with-lease` en ramas propias.
+
 ## Conventional Commits
 
 Formato: `tipo(scope): descripción breve en inglés`. Tipos permitidos:
