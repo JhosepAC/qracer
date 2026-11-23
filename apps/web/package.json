@@ -10,6 +10,7 @@
   "dependencies": {
     "@qracer/game-core": "workspace:*",
     "@qracer/protocol": "workspace:*",
+    "@qracer/session-core": "workspace:*",
     "qrcode-generator": "2.0.4",
     "three": "0.187.0"
   },

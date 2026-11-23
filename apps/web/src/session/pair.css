@@ -1,0 +1,35 @@
+.pair-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-block: 1rem;
+}
+#app [hidden] {
+  display: none;
+}
+.pair-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.55rem;
+  background: #10171b;
+  color: #f3f6f3;
+  border: 1px solid #657b83;
+  border-radius: 6px;
+  font: inherit;
+}
+.pair-form button {
+  cursor: pointer;
+}
+.pair-code {
+  display: block;
+  width: fit-content;
+  padding: 0.6rem 1rem;
+  margin-block: 1rem;
+  color: #ffcb47;
+  background: #10171b;
+  border-radius: 8px;
+  font-size: clamp(1.75rem, 6vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
