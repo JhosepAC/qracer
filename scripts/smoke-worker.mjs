@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { smokeProbeWorker, testProbeKey } from "./probe-worker.mjs";
 
 const cwd = fileURLToPath(new URL("../apps/relay-cloudflare/", import.meta.url));
 for (const environment of ["local", "production"]) {
@@ -19,6 +20,7 @@ for (const environment of ["local", "production"]) {
       "dev",
       "--env",
       environment,
+      ...(environment === "local" ? ["--var", `PROBE_KEY:${testProbeKey}`] : []),
       "--ip",
       "127.0.0.1",
       "--port",
@@ -57,6 +59,7 @@ for (const environment of ["local", "production"]) {
     if (environment === "local") {
       if ((await response.json()).storage !== "sqlite-ready")
         throw new Error("SQLite binding failed");
+      await smokeProbeWorker(origin);
     } else if (response.status !== 404)
       throw new Error("Production diagnostics must remain disabled");
     console.log(`Worker ${environment} smoke passed (local emulation only).`);

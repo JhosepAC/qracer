@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@qracer/probe": "workspace:*",
     "@qracer/protocol": "workspace:*"
   },
   "devDependencies": {

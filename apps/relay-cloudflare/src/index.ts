@@ -1,7 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import { health } from "@qracer/protocol";
+import type { ProbeEnv } from "./probe-room.ts";
+import { routeProbe } from "./probe-router.ts";
+export { ProbeRoom } from "./probe-room.ts";
 
-interface Env {
+interface Env extends ProbeEnv {
   ROOMS: DurableObjectNamespace<Room>;
   LOCAL_DIAGNOSTICS: string;
 }
@@ -19,6 +22,8 @@ export class Room extends DurableObject<Env> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const probe = await routeProbe(request, env);
+    if (probe) return probe;
     if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
     const path = new URL(request.url).pathname;
     if (path === "/health")

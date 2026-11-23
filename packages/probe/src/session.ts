@@ -17,6 +17,7 @@ export interface Peer {
   windowAt: number;
   rate: number;
   received: number;
+  signalBytes?: number;
 }
 export interface Snapshot {
   credentials: Credentials;
@@ -106,6 +107,10 @@ export class ProbeSession {
       };
     }
     if (!peer.role) return reject("Authenticate first");
+    if (message.type === "SIGNAL") {
+      peer.signalBytes = (peer.signalBytes ?? 0) + new TextEncoder().encode(message.payload).length;
+      if (peer.signalBytes > 65536) return reject("Signaling budget exceeded");
+    }
     if (message.type === "STATS") {
       return {
         send: [
