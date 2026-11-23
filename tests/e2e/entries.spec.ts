@@ -44,8 +44,8 @@ test.describe("mobile controller", () => {
     });
     await page.goto("/controller/");
     await expect(page.getByRole("heading", { name: /El control/ })).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("próximamente");
-    await expect(page.getByRole("button", { name: "Freno" })).toBeDisabled();
+    await expect(page.getByRole("status")).toContainText("Escanea");
+    await expect(page.locator("[data-drive=brake]")).toBeDisabled();
     expect(scripts.some((url) => /\/play-|three/i.test(url))).toBe(false);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

@@ -1,3 +1,4 @@
+import { controlsMarkup, mountDrive } from "./drive.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { ROOM_ID, TOKEN } from "@qracer/session-core/wire";
 import { parseInvitation, type RoomToken, SessionLink, sessionError } from "../session/link.ts";
@@ -14,7 +15,7 @@ root.innerHTML = `
   <main class="controller-shell">
     <section class="panel" aria-labelledby="controller-title">
       <h1 id="controller-title">El control<br>está en tus manos.</h1>
-      <p class="status" id="pair-status" role="status">Escanea el QR de la PC o pega su enlace. La conducción móvil llegará próximamente.</p>
+      <p class="status" id="pair-status" role="status">Escanea el QR de la PC o pega su enlace para conectar el mando.</p>
       <output id="pair-code" class="pair-code" aria-label="Código de comprobación" hidden></output>
       <form id="join-form" class="pair-form">
         <label for="join-link">Enlace de invitación</label>
@@ -22,11 +23,7 @@ root.innerHTML = `
         <button class="button primary" type="submit">Solicitar acceso</button>
       </form>
       <button type="button" class="button" id="leave" hidden>Cerrar conexión</button>
-      <fieldset disabled><legend>Controles de carrera</legend>
-        <div class="controls"><button type="button" aria-label="Girar a la izquierda">←</button>
-        <button type="button" aria-label="Girar a la derecha">→</button>
-        <button type="button">Freno</button><button type="button">Nitro</button></div>
-      </fieldset>
+      ${controlsMarkup}
       <a class="text-link" href="/play/">Volver a QRacer</a>
     </section>
   </main>`;
@@ -37,6 +34,7 @@ function element<T extends HTMLElement>(id: string): T {
   return node as T;
 }
 
+const drive = mountDrive(root);
 const status = element("pair-status");
 const form = element<HTMLFormElement>("join-form");
 const input = element<HTMLInputElement>("join-link");
@@ -74,6 +72,7 @@ function readStored(): RoomToken | undefined {
 
 function connect(key: RoomToken, resume = false) {
   link?.dispose();
+  drive.configure();
   if (!resume) remember();
   form.hidden = true;
   leave.hidden = false;
@@ -83,21 +82,29 @@ function connect(key: RoomToken, resume = false) {
     frame(frame) {
       if (frame.type === "RESUME") remember({ room: key.room, token: frame.token });
       if (frame.type === "ERROR") status.textContent = sessionError(frame.code);
-      if (frame.type !== "STATE") return;
+      if (frame.type !== "STATE") {
+        if ("epoch" in frame) drive.receive(frame);
+        return;
+      }
+      if (frame.phase === "connected")
+        drive.configure(frame.epoch, (packet) => link?.send(packet) ?? false);
+      else drive.configure();
       if (root) root.dataset.epoch = String(frame.epoch);
       code.hidden = frame.phase !== "pending";
       code.value = frame.code ?? "";
       if (frame.phase === "pending")
         status.textContent = "Esperando aprobación. Comprueba el código con la PC.";
       else if (frame.phase === "connected")
-        status.textContent = "Mando vinculado. La conducción móvil llegará próximamente.";
+        status.textContent = "Mando vinculado. Elige «Jugar con móvil» en la PC.";
       else status.textContent = "Esperando que la PC vuelva a conectarse…";
     },
     reconnecting() {
+      drive.configure();
       code.hidden = true;
       status.textContent = "Reconectando con la sala…";
     },
     ended(message) {
+      drive.configure();
       remember();
       form.hidden = false;
       leave.hidden = true;
@@ -118,6 +125,7 @@ form.onsubmit = (event) => {
 
 leave.onclick = () => {
   link?.dispose();
+  drive.configure();
   remember();
   form.hidden = false;
   leave.hidden = code.hidden = true;
