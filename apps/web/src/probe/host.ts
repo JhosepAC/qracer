@@ -2,6 +2,7 @@ import qrcode from "qrcode-generator";
 import { element, exportReport, neutral, ProbeLink, relayUrl, validInput } from "./link.ts";
 import "./probe.css";
 import { RtcProbe } from "./rtc.ts";
+import type { createStress, Profile } from "./scene.ts";
 
 element("app").innerHTML = `
   <header><a class="brand" href="/play/">Q<span>RACER</span></a><span class="eyebrow">LAB / 02</span></header>
@@ -18,6 +19,8 @@ element("app").innerHTML = `
       <div id="qr" aria-label="Código QR de invitación"></div><p id="expiry"></p>
       <a id="invite" hidden rel="noreferrer" target="_blank">Abrir mando de prueba</a>
       <p id="error" role="alert"></p><p id="rtc-status">ICE sin probar</p><button id="export" class="secondary">Exportar mediciones</button>
+      <p id="graphics-status" role="status">Preparando muestra 3D…</p>
+      <label for="profile">Calidad de la prueba</label><select id="profile"><option value="low">Baja · 720p</option><option value="balanced" selected>Equilibrada</option><option value="high">Alta</option></select>
       <small>Invitación de un solo uso · 2 min para conectar · sesión de 20 min. Tras desconectar, crea otro enlace.</small>
     </aside>
   </section>`;
@@ -29,6 +32,45 @@ relay.value = location.hostname.endsWith("pages.dev")
     : location.origin;
 let link: ProbeLink | undefined;
 let rtc: RtcProbe | undefined;
+let graphics: Awaited<ReturnType<typeof createStress>> | undefined;
+let pageLeft = false;
+const parameters = new URLSearchParams(location.search);
+const profile: Profile =
+  parameters.get("quality") === "low"
+    ? "low"
+    : parameters.get("quality") === "high"
+      ? "high"
+      : "balanced";
+element<HTMLSelectElement>("profile").value = profile;
+element<HTMLSelectElement>("profile").onchange = () => {
+  const url = new URL(location.href);
+  url.searchParams.set("quality", element<HTMLSelectElement>("profile").value);
+  location.assign(url);
+};
+if (parameters.has("benchmark")) document.body.classList.add("benchmark");
+void import("./scene.ts")
+  .then(async ({ createStress }) => {
+    graphics = await createStress(
+      element("viewport"),
+      profile,
+      parameters.has("benchmark"),
+      (message) => {
+        element("graphics-status").textContent = message;
+      },
+    );
+    if (pageLeft) graphics.dispose();
+  })
+  .catch((error: unknown) => {
+    element("graphics-status").textContent =
+      error instanceof Error
+        ? `${error.message} El QR sigue disponible.`
+        : "No se pudo cargar la escena. El QR sigue disponible.";
+  });
+element("viewport").addEventListener("probe-report", () => {
+  element("viewport").dispatchEvent(
+    new CustomEvent("probe-report-result", { detail: graphics?.report() ?? null }),
+  );
+});
 let input = neutral();
 let receivedAt = -Infinity;
 let inviteUntil = 0;
@@ -182,11 +224,14 @@ element("export").onclick = () => {
     stalePauses: stale,
     rttSamples: rtts.length,
     rtc: rtc?.report ?? null,
+    graphics: graphics?.report() ?? null,
     rttP95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? null,
     note: "RTT de aplicación PC-relay-móvil-relay-PC; huecos de secuencia no equivalen a pérdida IP.",
   });
 };
 window.addEventListener("pagehide", () => {
+  pageLeft = true;
+  graphics?.dispose();
   clearInterval(watchdog);
   clearInterval(heartbeat);
   link?.close();
