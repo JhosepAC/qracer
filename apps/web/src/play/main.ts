@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from "@qracer/protocol";
+import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { featureFlags } from "../features.ts";
 import { createPreview } from "./preview.ts";
 import "../styles.css";

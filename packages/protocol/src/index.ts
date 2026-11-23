@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { PROTOCOL_VERSION } from "./version.ts";
 
-export const PROTOCOL_VERSION = 1;
+export { PROTOCOL_VERSION } from "./version.ts";
 export const MAX_MESSAGE_BYTES = 1024;
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
