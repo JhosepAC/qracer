@@ -1,0 +1,12 @@
+{
+  "name": "@qracer/session-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/session.ts",
+    "./wire": "./src/wire.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
