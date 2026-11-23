@@ -2,6 +2,9 @@ import {
   AUTH_MS,
   type ClientFrame,
   type Creation,
+  type DriveFrame,
+  type DriveRate,
+  permitInput,
   type ErrorCode,
   INVITE_MS,
   MAX_PEERS,
@@ -17,6 +20,8 @@ export interface Peer {
   authUntil: number;
   windowAt: number;
   count: number;
+  total?: number;
+  drive?: DriveRate;
 }
 
 interface Pending {
@@ -269,13 +274,21 @@ export class RoomSession {
     if (received - peer.windowAt >= 1000) {
       peer.windowAt = received;
       peer.count = 0;
+      peer.total = 0;
     }
-    const message = ++peer.count <= 8 ? parseClient(raw) : undefined;
-    if (!message) return [this.reject(id, "INVALID"), ...this.remove(id, received)];
+    peer.total = (peer.total ?? 0) + 1;
+    const message = peer.total <= 50 ? parseClient(raw) : undefined;
+    if (!message || (message.type !== "INPUT" && ++peer.count > 12))
+      return [this.reject(id, "INVALID"), ...this.remove(id, received)];
     if (!this.identified(id) && message.type !== "AUTH")
       return [this.reject(id, "AUTH_REQUIRED"), ...this.remove(id, received)];
     if (message.type === "AUTH" && message.version !== SESSION_VERSION)
       return [this.reject(id, "VERSION_MISMATCH"), ...this.remove(id, received)];
+    if ("epoch" in message) {
+      const expired = this.expire(received);
+      if (!this.peers.has(id)) return expired;
+      return expired.concat(this.forward(peer, message, received));
+    }
     const proof = message.type === "AUTH" ? await hash(message.token) : "";
     const fresh =
       (message.type === "AUTH" && message.role === "resume") ||
@@ -290,6 +303,26 @@ export class RoomSession {
         ? this.authorize(id, message, proof, fresh, time)
         : this.hostAction(id, message, fresh, time);
     return expired.concat(effects);
+  }
+
+  private forward(peer: Peer, frame: DriveFrame, now: number): Effect[] {
+    const { controller, host, epoch } = this.state;
+    if (!host || !controller?.id || frame.epoch !== epoch) return [];
+    const fromHost = peer.id === host;
+    if (!fromHost && peer.id !== controller.id) return [];
+    if (
+      (fromHost && (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE")) ||
+      (!fromHost && (frame.type === "DRIVE_STATE" || frame.type === "FEEDBACK"))
+    )
+      return [];
+    if (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE") {
+      if (!peer.drive || peer.drive.epoch !== epoch)
+        peer.drive = { epoch, seq: -1, inputsAt: now, credit: 2 };
+      if (frame.seq <= peer.drive.seq || (frame.type === "INPUT" && !permitInput(peer.drive, now)))
+        return [];
+      peer.drive.seq = frame.seq;
+    }
+    return [{ id: fromHost ? controller.id : host, frame }];
   }
 
   private authorize(
