@@ -1,6 +1,6 @@
 import { type DriveFrame, type DriveMode, INPUT_HZ } from "@qracer/session-core/wire";
 import { DriveChannel } from "../session/drive-channel.ts";
-import { mountOptions, optionsMarkup } from "./options.ts";
+import { mountOptions, optionsMarkup, steeringMarkup } from "./options.ts";
 import { type Control, TouchInput } from "./touch.ts";
 import "./drive.css";
 
@@ -10,6 +10,7 @@ export const controlsMarkup = `
     <button class="handset-pause" type="button" id="mobile-pause" disabled>Pausa</button></div>
   <div class="handset-telemetry"><span><strong id="mobile-speed">0</strong> km/h</span>
     <span id="mobile-integrity">Integridad · —</span><span>Nitro <meter id="mobile-nitro" max="1" value="0"></meter></span></div>
+  ${steeringMarkup}
   <div class="handset-input">
     <div class="handset-steering">
       <button type="button" data-drive="wheel" class="virtual-wheel" aria-label="Volante táctil" disabled><span>VOLANTE</span></button>
@@ -25,8 +26,8 @@ export const controlsMarkup = `
     </div>
   </div>
   <details class="handset-help"><summary>Cómo conducir</summary>
-    <p>Elige «Jugar con móvil» en la PC. Mira la carretera, arrastra el volante o mantén una flecha para girar.
-    Puedes girar y acelerar con dos dedos. Suelta los controles antes de continuar una carrera en pausa.</p>
+    <p>Activa la inclinación con el móvil centrado. Inclínalo para girar y mantén el pedal para acelerar.
+    También puedes usar el volante o las flechas. Elige «Jugar con móvil» en la PC y suelta los controles antes de continuar una carrera en pausa.</p>
   </details>
   ${optionsMarkup}
 </section>`;

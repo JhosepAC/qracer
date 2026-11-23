@@ -64,7 +64,9 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await page.getByRole("button", { name: "Aprobar mando" }).click();
     await page.getByRole("button", { name: "Cerrar panel" }).click();
     await expect(phone.locator("#drive-shell")).toBeVisible();
-    await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
+    await expect(
+      phone.getByRole("group", { name: "Modo de dirección" }).getByRole("button").first(),
+    ).toHaveText("Activar inclinación");
     await phone.getByRole("button", { name: "Activar inclinación" }).click();
     await expect(phone.locator("#tilt-status")).toContainText("Permiso denegado");
     await phone.evaluate(() => {
@@ -72,7 +74,12 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     });
     await phone.getByRole("button", { name: "Activar inclinación" }).click();
     await phone.evaluate(async () => {
-      window.dispatchEvent(new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 0 }));
+      for (let i = 0; i < 5; i++) {
+        window.dispatchEvent(
+          new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 0 }),
+        );
+        await new Promise((done) => setTimeout(done, 16));
+      }
       for (let i = 0; i < 8; i++) {
         await new Promise((done) => setTimeout(done, 24));
         window.dispatchEvent(
@@ -81,26 +88,40 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
       }
     });
     await expect.poll(() => tiltSteering).toBe(true);
+    await expect(phone.locator("#tilt-status")).toContainText("Inclinación activa");
+    await expect(phone.locator("#tilt-status")).toContainText("dejó de responder");
     await phone.getByRole("button", { name: "Usar táctil" }).click();
 
+    await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
     await phone.getByLabel("Lado de los pedales").selectOption("left");
     await phone.getByLabel("Vibración", { exact: true }).check();
     await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
     await expect(phone.locator("#drive-shell")).toHaveAttribute("data-side", "left");
     await phone.setViewportSize({ width: 844, height: 390 });
-    expect(
-      await phone.locator(".handset-input button").evaluateAll((buttons) =>
-        buttons.every((button) => {
-          const box = button.getBoundingClientRect();
-          return (
-            box.width >= 48 &&
-            box.height >= 48 &&
-            box.right <= innerWidth &&
-            box.bottom <= innerHeight
-          );
-        }),
-      ),
-    ).toBe(true);
+    const clipped = await phone.locator(".handset-input button").evaluateAll((buttons) =>
+      buttons.flatMap((button) => {
+        const { width, height, right, bottom, top, left } = button.getBoundingClientRect();
+        return width < 48 ||
+          height < 48 ||
+          left < 0 ||
+          right > innerWidth ||
+          top < 0 ||
+          bottom > innerHeight
+          ? [
+              {
+                control: button.getAttribute("data-drive"),
+                width,
+                height,
+                right,
+                bottom,
+                top,
+                left,
+              },
+            ]
+          : [];
+      }),
+    );
+    expect(clipped).toEqual([]);
     await phone.setViewportSize({ width: 390, height: 844 });
 
     const start = page.getByRole("button", { name: "Jugar con móvil" });

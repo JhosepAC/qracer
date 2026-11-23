@@ -52,6 +52,26 @@
   touch-action: none;
   user-select: none;
 }
+.handset-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.handset-modes button {
+  flex: 1 1 auto;
+}
+.handset-modes #activate-tilt:not(:disabled) {
+  background: #67e8db;
+  border-color: #67e8db;
+  color: #10171b;
+}
+.handset-modes p {
+  width: 100%;
+  min-height: 1.3em;
+  margin: 0;
+  color: #b5c5c8;
+  font-size: 0.82rem;
+}
 .handset button[data-held] {
   background: #ffdf85;
   color: #10171b;
@@ -93,14 +113,23 @@ body:has(.handset:not([hidden])) #controller-title {
   font-size: clamp(1.6rem, 5vw, 2.4rem);
 }
 @media (orientation: landscape) and (max-height: 550px) {
-  body:has(.handset:not([hidden])) .topbar {
-    padding-block: 0.4rem;
+  .handset {
+    grid-template-columns: 1fr auto;
+    gap: 0.45rem 0.75rem;
+    margin-block: 0.55rem;
   }
-  body:has(.handset:not([hidden])) .controller-shell {
-    padding-block: 0.4rem;
+  .handset > :not(.handset-bar, .handset-telemetry) {
+    grid-column: 1 / -1;
   }
-  body:has(.handset:not([hidden])) #controller-title {
-    display: none;
+  .handset-telemetry {
+    justify-content: end;
+  }
+  .handset-modes {
+    align-items: center;
+  }
+  .handset-modes p {
+    width: auto;
+    flex: 1 1 15rem;
   }
   .handset-input {
     grid-template-columns: 1.3fr 2fr;
@@ -112,7 +141,7 @@ body:has(.handset:not([hidden])) #controller-title {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .handset button.virtual-wheel {
-    width: 84px;
+    width: 72px;
     min-width: 68px;
   }
 }
@@ -176,4 +205,14 @@ body:has(.handset:not([hidden])) #controller-title {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  body:has(.handset:not([hidden])) .topbar,
+  body:has(.handset:not([hidden])) .controller-shell,
+  body:has(.handset:not([hidden])) .controller-shell .panel {
+    padding-block: 0.35rem;
+  }
+  body:has(.handset:not([hidden])) #pair-status {
+    margin-block: 0.35rem;
+  }
 }

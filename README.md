@@ -3,7 +3,7 @@
 Juego arcade 3D para navegador de PC, controlado desde un teléfono mediante un código QR. El mando web funciona sin instalar una aplicación; gráficos, conexión y controles cuentan con alternativas según las capacidades del dispositivo.
 
 **Estado:** la carrera costera se puede jugar con teclado o con un móvil
-vinculado. El mando incluye volante táctil, botones, inclinación opcional y
+vinculado. El mando incluye inclinación, volante táctil, botones y
 pausa segura al perder la entrada. El laboratorio F02 de sensores, relay y
 rendimiento sigue en validación.
 Instrucciones del laboratorio en [PROBES.md](PROBES.md).
