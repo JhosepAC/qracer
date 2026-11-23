@@ -58,11 +58,14 @@ function disposeObjects(roots: Object3D[]) {
 export async function createRaceView(container: HTMLElement, signal: AbortSignal) {
   const scene = new Scene();
   const roots: Object3D[] = [scene];
-  const renderer = new WebGLRenderer({
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("webgl2", {
     alpha: true,
     antialias: true,
     powerPreference: "high-performance",
   });
+  if (!context) throw new Error("Activa WebGL 2 y recarga para abrir el circuito.");
+  const renderer = new WebGLRenderer({ canvas, context, alpha: true, antialias: true });
   const camera = new PerspectiveCamera(52, 1, 0.2, 490);
   const pose = { x: 0, z: 0, heading: 0 };
   const dummy = new Object3D();
@@ -123,7 +126,7 @@ export async function createRaceView(container: HTMLElement, signal: AbortSignal
       const response = await fetch(`/assets/probe/${name}.glb`, {
         signal,
       });
-      if (!response.ok) throw new Error("No se pudo cargar el circuito.");
+      if (!response.ok) throw new Error("El servidor no pudo entregar los modelos del circuito.");
       const glb = await response.arrayBuffer();
       if (glb.byteLength > 8 * 1024 * 1024) throw new Error("Recurso fuera de presupuesto.");
       const asset = await loader.parseAsync(glb, "");

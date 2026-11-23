@@ -206,13 +206,15 @@ async function mount() {
     preview.dataset.graphics = "ready";
     start.disabled = resume.disabled = restart.disabled = false;
     status.textContent = "";
-  } catch {
+  } catch (error) {
     if (loading !== attempt || (attempt.signal.aborted && !timedOut)) return;
     view?.dispose();
     view = undefined;
     status.textContent = timedOut
       ? "El circuito tardó demasiado en cargar. Recarga para reintentar."
-      : "Activa WebGL 2 y recarga para abrir el circuito.";
+      : error instanceof Error && error.message.startsWith("Activa WebGL 2")
+        ? error.message
+        : "No se pudo cargar el circuito. Recarga para reintentar.";
   } finally {
     window.clearTimeout(deadline);
   }
