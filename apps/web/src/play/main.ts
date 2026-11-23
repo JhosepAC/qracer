@@ -1,8 +1,12 @@
+import { PROTOCOL_VERSION } from "@qracer/protocol";
+import { featureFlags } from "../features.ts";
 import { createPreview } from "./preview.ts";
 import "../styles.css";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing application root");
+root.dataset.protocolVersion = String(PROTOCOL_VERSION);
+root.dataset.pairingEnabled = String(featureFlags.pairing.enabled);
 root.innerHTML = `
   <header class="topbar"><a class="brand" href="/play/">Q<span>Racer</span></a>
     <span class="tag">Tu teléfono, al volante</span></header>
