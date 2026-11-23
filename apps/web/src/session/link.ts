@@ -1,5 +1,6 @@
 import {
   AUTH_MS,
+  INVITE_MS,
   type ClientFrame,
   type Creation,
   type ErrorCode,
@@ -91,9 +92,13 @@ function parseServer(raw: string): ServerFrame | undefined {
         typeof data.token === "string" &&
         TOKEN.test(data.token) &&
         typeof data.until === "number" &&
-        Number.isSafeInteger(data.until)
+        Number.isSafeInteger(data.until) &&
+        typeof data.ttl === "number" &&
+        Number.isSafeInteger(data.ttl) &&
+        data.ttl >= 0 &&
+        data.ttl <= INVITE_MS
       )
-        return { type: "INVITE", token: data.token, until: data.until };
+        return { type: "INVITE", token: data.token, until: data.until, ttl: data.ttl };
       return;
     case "RESUME":
       if (typeof data.token === "string" && TOKEN.test(data.token))
@@ -188,13 +193,13 @@ export class SessionLink {
   }
 
   private connect() {
-    let address: string;
+    let socket: WebSocket;
     try {
-      address = relayOrigin();
+      const address = relayOrigin().replace(/^http/, "ws");
+      socket = new WebSocket(`${address}/session/ws/${this.key.room}`);
     } catch {
-      return this.finish("El origen del relay es inválido.");
+      return this.finish("No se pudo abrir el enlace con el relay.");
     }
-    const socket = new WebSocket(`${address.replace(/^http/, "ws")}/session/ws/${this.key.room}`);
     this.socket = socket;
     this.authTimer = window.setTimeout(() => socket.close(), AUTH_MS + 1000);
     socket.onopen = () => {
