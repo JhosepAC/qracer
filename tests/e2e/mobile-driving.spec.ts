@@ -14,7 +14,9 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
       export async function createRaceView(container) {
         const canvas = document.createElement("canvas");
         container.append(canvas);
-        return { canvas, draw() {}, stats: () => ({}), dispose: () => canvas.remove() };
+        return { canvas, draw(_previous, current) {
+          container.dataset.lateral = String(current.driver.d);
+        }, stats: () => ({}), dispose: () => canvas.remove() };
       }
     `,
     }),
@@ -55,6 +57,20 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
   });
 
   const file = (name: string) => info.outputPath(name);
+  const tiltRight = () =>
+    phone.evaluate(async () => {
+      function orientation(gamma: number) {
+        window.dispatchEvent(new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma }));
+      }
+      for (let i = 0; i < 5; i++) {
+        orientation(0);
+        await new Promise((done) => setTimeout(done, 16));
+      }
+      for (let i = 0; i < 12; i++) {
+        await new Promise((done) => setTimeout(done, 24));
+        orientation(22);
+      }
+    });
   try {
     await page.goto("/play/");
     await page.getByRole("button", { name: "Conectar móvil" }).click();
@@ -73,20 +89,7 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
       document.body.dataset.tiltPermission = "granted";
     });
     await phone.getByRole("button", { name: "Activar inclinación" }).click();
-    await phone.evaluate(async () => {
-      for (let i = 0; i < 5; i++) {
-        window.dispatchEvent(
-          new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 0 }),
-        );
-        await new Promise((done) => setTimeout(done, 16));
-      }
-      for (let i = 0; i < 8; i++) {
-        await new Promise((done) => setTimeout(done, 24));
-        window.dispatchEvent(
-          new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 22 }),
-        );
-      }
-    });
+    await tiltRight();
     await expect.poll(() => tiltSteering).toBe(true);
     await expect(phone.locator("#tilt-status")).toContainText("Inclinación activa");
     await expect(phone.locator("#tilt-status")).toContainText("dejó de responder");
@@ -129,6 +132,12 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await start.click();
     await expect(page.locator("#app")).toHaveAttribute("data-control", "mobile");
     await expect(phone.locator("#drive-state")).toContainText("En carrera", { timeout: 20000 });
+    await phone.getByRole("button", { name: "Activar inclinación" }).click();
+    await tiltRight();
+    await expect
+      .poll(async () => Number(await page.locator("#preview").getAttribute("data-lateral")))
+      .toBeGreaterThan(0.2);
+    await phone.getByRole("button", { name: "Usar táctil" }).click();
 
     const accel = phone.getByRole("button", { name: "Acelerar" });
     const right = phone.getByRole("button", { name: "Girar a la derecha" });
