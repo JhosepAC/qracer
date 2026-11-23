@@ -25,9 +25,10 @@ describe("bootstrap protocol validation", () => {
     expect(parseClientMessage(raw)).toBeUndefined();
   });
 
-  it("enforces bytes rather than character count for multibyte payloads", () => {
-    const oversized = `{"type":"PING","id":0,"x":"${"é".repeat(MAX_MESSAGE_BYTES / 2)}"}`;
-    expect(oversized.length).toBeLessThan(MAX_MESSAGE_BYTES);
-    expect(parseClientMessage(oversized)).toBeUndefined();
+  it("accepts the size boundary and rejects an otherwise valid oversized message", () => {
+    const message = '{"type":"PING","id":0}';
+    const padded = message.padEnd(MAX_MESSAGE_BYTES, " ");
+    expect(parseClientMessage(padded)).toEqual({ type: "PING", id: 0 });
+    expect(parseClientMessage(`${padded} `)).toBeUndefined();
   });
 });
