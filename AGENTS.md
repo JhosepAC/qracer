@@ -2,7 +2,7 @@
 
 ## Documentación que guía el desarrollo
 
-Leer [docs/README.md](docs/README.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) y el contrato del área afectada antes de implementar. [docs/ROADMAP.md](docs/ROADMAP.md) registra las fases y su estado; no duplicar allí decisiones generales. Las instrucciones del propietario prevalecen sobre recomendaciones de skills y herramientas.
+La planificación en `docs/` es local y no se publica. Cuando exista, leer [docs/README.md](docs/README.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) y el contrato del área afectada. En un clon sin esa carpeta, usar [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) y las instrucciones vigentes del propietario; no asumir mecánicas que no se hayan definido. [docs/ROADMAP.md](docs/ROADMAP.md) registra localmente las fases y su estado. Las instrucciones del propietario prevalecen sobre recomendaciones de skills y herramientas.
 
 ## Reglas obligatorias
 
