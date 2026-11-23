@@ -3,6 +3,8 @@ packages:
   - packages/*
 
 minimumReleaseAge: 1440
+engineStrict: true
+saveExact: true
 
 allowBuilds:
   esbuild: true

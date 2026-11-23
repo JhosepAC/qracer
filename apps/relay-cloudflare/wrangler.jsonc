@@ -9,6 +9,10 @@
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   "env": {
+    "production": {
+      "vars": { "LOCAL_DIAGNOSTICS": "false" },
+      "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] }
+    },
     "local": {
       "vars": { "LOCAL_DIAGNOSTICS": "true" },
       "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] }
