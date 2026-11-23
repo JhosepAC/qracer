@@ -8,6 +8,11 @@ pausa segura al perder la entrada. El laboratorio F02 de sensores, relay y
 rendimiento sigue en validación.
 Instrucciones del laboratorio en [PROBES.md](PROBES.md).
 
+El menú costero ofrece tres perfiles gráficos. Para medir la carrera en tu
+equipo después de compilar, ejecuta `node scripts/benchmark-race.mjs`. El
+informe separa los intervalos de imagen, el tiempo del callback y las muestras
+GPU que proporcione el navegador.
+
 - [Instrucciones para agentes](AGENTS.md)
 
 La planificación en `docs/` se mantiene local y está excluida del repositorio por decisión del propietario. Las reglas públicas de contribución están en [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -78,10 +83,13 @@ permite solo ese puerto en tu red privada.
    flechas y acelerar a la vez con otro dedo. Freno tiene prioridad. Al volver
    de una interrupción, suelta los controles y pulsa **Continuar** en la PC.
 
-El mando funciona por táctil en LAN HTTP. **Activar inclinación** y mantener
-la pantalla activa requieren HTTPS y soporte del navegador. Denegar el permiso
-conserva el táctil. Los ajustes incluyen calibración, lateralidad, sensibilidad,
-giro invertido, asistencia y vibración cuando el teléfono la ofrece.
+En un origen HTTPS de confianza, elige **Activar inclinación** en el mando y
+sostén el teléfono quieto hasta que termine de centrarse. Inclínalo para girar y
+usa los pedales en pantalla. Puedes volver al táctil desde el mismo mando. En
+LAN HTTP, el volante y las flechas están listos desde la vinculación.
+En **Ajustes y diagnóstico** puedes regular la sensibilidad, invertir el giro
+y cambiar el lado de los pedales o activar la asistencia. La vibración y la
+pantalla activa dependen del navegador.
 
 En loopback la PC permite probar el enlace en otro navegador local. Para
 mostrar un QR que el teléfono pueda abrir, entra en la PC por su IP LAN.
