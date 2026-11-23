@@ -21,19 +21,21 @@ export function arc(distance: number, curvature: number, out: RoadPose): RoadPos
   return out;
 }
 
-const starts: RoadPose[] = [{ x: 0, z: 0, heading: 0 }];
+const zero: RoadPose = { x: 0, z: 0, heading: 0 };
+const starts: RoadPose[] = [zero];
+let start = zero;
 for (const curve of pattern) {
-  const start = starts[starts.length - 1]!;
   const end = arc(SEGMENT_LENGTH, curve * CURVE, { x: 0, z: 0, heading: 0 });
   const cos = Math.cos(start.heading);
   const sin = Math.sin(start.heading);
-  starts.push({
+  start = {
     x: start.x + end.x * cos - end.z * sin,
     z: start.z + end.x * sin + end.z * cos,
     heading: start.heading + end.heading,
-  });
+  };
+  starts.push(start);
 }
-const cycleEnd = starts[pattern.length]!;
+const cycleEnd = start;
 
 function offset(index: number): number {
   return index - Math.floor(index / pattern.length) * pattern.length;
@@ -50,8 +52,8 @@ export function firstSegment(s: number): number {
 /** Origin is the centre of a nearby segment. Score never uses these local coordinates. */
 export function roadPose(s: number, d: number, originIndex: number, out: RoadPose): RoadPose {
   const index = Math.floor(s / SEGMENT_LENGTH);
-  const start = starts[offset(index)]!;
-  const origin = starts[offset(originIndex)]!;
+  const start = starts[offset(index)] ?? zero;
+  const origin = starts[offset(originIndex)] ?? zero;
   const cycles = Math.floor(index / pattern.length) - Math.floor(originIndex / pattern.length);
   arc(s - index * SEGMENT_LENGTH, segmentCurvature(index), out);
   const cos = Math.cos(start.heading);

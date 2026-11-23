@@ -43,10 +43,10 @@ export function openLane(seed: number): number {
 
 /** A candidate that blocks the continuous escape lane is replaced by a safe row. */
 export function trafficPattern(seed: number, row: number): readonly TrafficCar[] {
-  const escape = openLane(seed);
+  const safeLane = openLane(seed);
   const mask = randomWord(seed, row, 1) & 7;
-  const safeMask = 1 << ((escape + 1 + (row % 2)) % 3);
-  const chosen = mask === 0 || mask & (1 << escape) ? safeMask : mask;
+  const safeMask = 1 << ((safeLane + 1 + (row % 2)) % 3);
+  const chosen = mask === 0 || mask & (1 << safeLane) ? safeMask : mask;
   return laneCenters.flatMap((d, lane) =>
     chosen & (1 << lane)
       ? [{ id: row * 3 + lane, d, paint: randomWord(seed, row, 2 + lane) % 4 }]
@@ -61,8 +61,10 @@ export function trafficPosition(row: TrafficRow, tick: number): number {
 export function advanceTraffic(world: Traffic, seed: number, s: number, tick: number): Traffic {
   const rows = world.rows;
   let expired = 0;
-  while (expired < rows.length && trafficPosition(rows[expired]!, tick) < s - KEEP_BEHIND)
+  for (const row of rows) {
+    if (trafficPosition(row, tick) >= s - KEEP_BEHIND) break;
     expired++;
+  }
   if (expired === 0 && world.nextRow * ROW_SPACING > s + TRAFFIC_LOOKAHEAD) return world;
   const retained = rows.slice(expired);
   let nextRow = world.nextRow;
