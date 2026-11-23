@@ -151,3 +151,11 @@
     margin-top: 0;
   }
 }
+.race-link {
+  top: 5.4rem;
+  left: auto;
+  right: 4vw;
+  transform: none;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.6rem;
+}

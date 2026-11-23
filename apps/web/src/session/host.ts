@@ -1,10 +1,16 @@
-import type { ServerFrame } from "@qracer/session-core/wire";
+import type { DriveFrame, ServerFrame } from "@qracer/session-core/wire";
 import qrcode from "qrcode-generator";
 import { controllerUrl, createSession, SessionLink, sessionError } from "./link.ts";
 
 type State = Extract<ServerFrame, { type: "STATE" }>;
 
-export function mountPairing(trigger: HTMLButtonElement) {
+export function mountPairing(
+  trigger: HTMLButtonElement,
+  driving: {
+    connection: (epoch?: number, send?: (frame: DriveFrame) => boolean) => void;
+    message: (frame: DriveFrame) => void;
+  },
+) {
   const dialog = document.createElement("dialog");
   dialog.className = "pair-dialog race-controls";
   dialog.setAttribute("aria-labelledby", "pair-title");
@@ -101,6 +107,7 @@ export function mountPairing(trigger: HTMLButtonElement) {
   }
 
   function reset(message: string) {
+    driving.connection();
     pendingFetch?.abort();
     pendingFetch = undefined;
     session?.dispose();
@@ -140,7 +147,13 @@ export function mountPairing(trigger: HTMLButtonElement) {
       status.textContent = "Invitación lista. Esperando un móvil.";
       return;
     }
-    if (frame.type !== "STATE") return;
+    if (frame.type !== "STATE") {
+      if ("epoch" in frame) driving.message(frame);
+      return;
+    }
+    if (frame.phase === "connected")
+      driving.connection(frame.epoch, (packet) => session?.send(packet) ?? false);
+    else driving.connection();
     state = frame;
     if (frame.phase === "pending") {
       clearInvite();
@@ -180,6 +193,7 @@ export function mountPairing(trigger: HTMLButtonElement) {
       session = new SessionLink({ room: created.room, token: created.hostToken }, "host", {
         frame: (frame) => handle(frame, created.room),
         reconnecting() {
+          driving.connection();
           state = undefined;
           clearInvite();
           status.textContent = "Reconectando con la sala…";
