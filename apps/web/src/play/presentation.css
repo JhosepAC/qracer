@@ -1,0 +1,54 @@
+.presentation-dialog {
+  max-width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100svh - 2rem);
+  overflow: auto;
+  padding: 1.4rem;
+  border: 1px solid #789199;
+  border-top: 3px solid #ffcb47;
+  border-radius: 8px;
+  color: #f3f6f3;
+  background: #17282f;
+}
+.presentation-dialog::backdrop {
+  background: #071116cf;
+}
+.presentation-dialog form {
+  display: grid;
+  gap: 0.75rem;
+}
+.presentation-dialog h2 {
+  font-family: var(--race-display);
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+}
+.presentation-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.presentation-dialog output {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+.presentation-dialog input[type="range"] {
+  width: 100%;
+  min-height: 48px;
+  accent-color: #ffcb47;
+}
+.presentation-dialog input[type="checkbox"] {
+  width: 1.4rem;
+  height: 1.4rem;
+  accent-color: #ffcb47;
+}
+.presentation-dialog label:has(input[type="checkbox"]) {
+  min-height: 48px;
+}
+.race-bar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+#presentation-open {
+  min-height: 48px;
+  margin-inline-start: auto;
+  font: inherit;
+}

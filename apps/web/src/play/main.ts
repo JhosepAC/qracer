@@ -1,3 +1,5 @@
+import { RaceAudio } from "./audio.ts";
+import { mountPresentation } from "./presentation.ts";
 import { runReport } from "./run-report.ts";
 import { mountRunMenu, modeNames } from "./run-menu.ts";
 import { biomeAt, biomeNames } from "./biomes.ts";
@@ -96,6 +98,10 @@ pair.onclick = async () => {
   }
 };
 
+const sound = new RaceAudio();
+mountPresentation(sound, () => {
+  if (!clock.paused || resumeUntil) stop();
+});
 const runMenu = mountRunMenu(root, () => {
   clock.reset(runMenu.create());
   void mount();
@@ -134,12 +140,9 @@ let feedback = "";
 let feedbackUntil = 0;
 const pressed = (...codes: string[]) => Number(codes.some((code) => keys.has(code)));
 const clock = new FixedClock(createRace(), (state) => {
-  const input = source === "mobile" ? remote.get(performance.now()) : neutralInput;
-  if ("assist" in input && input.assist) assisted = true;
-  const next = stepRace(
-    state,
+  const input =
     source === "mobile"
-      ? input
+      ? remote.get(performance.now())
       : keys.size
         ? {
             steer: pressed("KeyD", "ArrowRight") - pressed("KeyA", "ArrowLeft"),
@@ -147,8 +150,10 @@ const clock = new FixedClock(createRace(), (state) => {
             brake: pressed("KeyS", "ArrowDown"),
             boost: Boolean(pressed("ShiftLeft", "ShiftRight")),
           }
-        : neutralInput,
-  );
+        : neutralInput;
+  if ("assist" in input && input.assist) assisted = true;
+  const next = stepRace(state, input);
+  sound.update(next, input);
   const event = next.events.find(({ type }) => type === "impact") ?? next.events.at(-1);
   if (source === "mobile" && channel.epoch !== undefined && !resumeUntil) {
     const kind =
@@ -206,6 +211,7 @@ function updateHud() {
 }
 
 function stop(finished = false, reason = "") {
+  sound.setActive(false);
   resumeUntil = 0;
   clock.pause();
   keys.clear();
@@ -282,6 +288,7 @@ function run(reset: boolean) {
   } else if (source === "mobile" && clock.current.phase === "countdown") {
     clock.reset({ ...clock.current, countdown: 3 * TICK_HZ });
   }
+  sound.setActive(true);
   keys.clear();
   resumeUntil =
     source === "mobile" && !reset && clock.current.phase === "racing"
@@ -484,6 +491,7 @@ element("finish-practice").onclick = () => {
   stop(true);
 };
 element("return-menu").onclick = () => {
+  sound.setActive(false);
   clock.pause();
   keys.clear();
   resumeUntil = 0;
@@ -535,6 +543,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && (!clock.paused || resumeUntil)) stop();
 });
 window.addEventListener("pagehide", () => {
+  sound.setActive(false);
   if (!clock.paused || resumeUntil) stop();
   loading?.abort();
   loading = undefined;
