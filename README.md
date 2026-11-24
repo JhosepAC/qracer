@@ -30,7 +30,7 @@ Abrir [PC](http://127.0.0.1:5173/play/) o [mando](http://127.0.0.1:5173/controll
 Son aplicaciones independientes: el renderer se carga únicamente en PC.
 En `/play/`, espera a que se cargue la escena WebGL 2 y elige **Salir a pista**.
 Usa **A/D** o **←/→** para girar, **W/↑** para acelerar, **S/↓** para frenar,
-**Shift** para activar nitro y **Esc** para pausar. La carrera comienza con
+**Espacio** (o **Shift**) para activar nitro y **Esc** para pausar. La carrera comienza con
 una cuenta atrás y termina al agotar la integridad. Puedes reiniciar desde
 la pausa o los resultados.
 
@@ -115,6 +115,27 @@ Los intermitentes ámbar anuncian las maniobras del tráfico. En resultados pued
 **Guardar resumen de carrera** con tiempos, maniobras, impactos y reglas, para
 compartir voluntariamente observaciones sin historial de sensores o credenciales. Si falta un entorno,
 la partida pausa antes de continuar y permite volver al menú para reintentar.
+
+## Sonido, comodidad e idiomas
+
+**Sonido y comodidad** permite silenciar antes de jugar y ajustar volumen general,
+música original y motor/efectos por separado. El audio solo se activa con una
+acción de juego y se suspende al pausar. No descarga música de terceros.
+
+Puedes activar cámara estable, reducir movimiento y flashes, usar asistencia y
+reasignar letras/flechas/espacio en **Teclado**. La preferencia del sistema de
+movimiento reducido también se respeta. Las ayudas separan las categorías de récord.
+Los menús y ajustes se recorren con Tab, Enter y Escape; no se afirma accesibilidad
+total de la conducción para lectores de pantalla.
+
+En el móvil, **Modo de una mano (ayuda)** acelera suavemente durante la carrera;
+el freno tiene prioridad y las interrupciones conservan la pausa segura. Vibración
+y flashes se pueden desactivar. Inclinación, táctil y teclado siguen disponibles
+según las capacidades del dispositivo.
+
+El selector **Idioma / Language** cambia entre español e inglés sin recargar ni
+perder la vinculación. Preferencias de presentación y mando se guardan localmente
+cuando el navegador lo permite; los resultados de carrera aún duran solo esta sesión.
 
 ## Transporte directo y recuperación
 

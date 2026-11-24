@@ -16,6 +16,8 @@ export class RaceAudio {
   private noise?: AudioBuffer;
   private running = false;
   private timer = 0;
+  private menuTimer = 0;
+  private generation = 0;
   private nextNote = 0;
   private note = 0;
   private lastTick = -1;
@@ -86,6 +88,8 @@ export class RaceAudio {
   }
 
   setActive(active: boolean) {
+    this.generation++;
+    clearTimeout(this.menuTimer);
     this.running = active;
     if (active) {
       this.lastTick = -1;
@@ -240,8 +244,28 @@ export class RaceAudio {
     this.boosted = race.driver.boosting;
   }
 
-  menu() {
-    if (this.context?.state === "running") this.tone(740, 0.055, 0.06, 1);
+  async menu() {
+    const context = this.context;
+    if (!context || this.settings.muted || this.settings.master === 0) return;
+    const generation = this.generation;
+    try {
+      await context.resume();
+      if (document.hidden) {
+        await context.suspend();
+        return;
+      }
+      if (generation !== this.generation) return;
+      this.tone(740, 0.055, 0.06, 1);
+      clearTimeout(this.menuTimer);
+      this.menuTimer = window.setTimeout(() => {
+        if (!this.running && generation === this.generation) {
+          this.clearVoices();
+          void context.suspend().catch(() => {});
+        }
+      }, 120);
+    } catch {
+      /* Optional menu cue; the silent route remains available. */
+    }
   }
   private clearVoices() {
     for (const voice of [...this.voices.values()]) voice.stop();

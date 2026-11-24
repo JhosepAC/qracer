@@ -69,7 +69,7 @@ export function mountPresentation(audio: RaceAudio, onOpen: () => void) {
   };
   trigger.onclick = () => {
     onOpen();
-    audio.menu();
+    void audio.menu();
     field("audio-status").textContent =
       audio.diagnostics.state === "no disponible"
         ? "Audio no disponible. Puedes seguir jugando en silencio."

@@ -10,7 +10,8 @@ test("requires a play gesture, supports silent play and suspends real audio on p
     }),
   );
   await page.addInitScript(() => {
-    const contexts: { context: AudioContext; analyser: AnalyserNode }[] = [];
+    const contexts: { context: AudioContext; analyser: AnalyserNode; tones: OscillatorNode[] }[] =
+      [];
     Object.assign(window, { qracerAudioTest: contexts });
     window.AudioContext = new Proxy(window.AudioContext, {
       construct(Target, args) {
@@ -22,7 +23,14 @@ test("requires a play gesture, supports silent play and suspends real audio on p
           limiter.connect(analyser);
           return limiter;
         };
-        contexts.push({ context, analyser });
+        const tones: OscillatorNode[] = [];
+        const oscillator = context.createOscillator.bind(context);
+        context.createOscillator = () => {
+          const node = oscillator();
+          tones.push(node);
+          return node;
+        };
+        contexts.push({ context, analyser, tones });
         return context;
       },
     });
@@ -71,6 +79,25 @@ test("requires a play gesture, supports silent play and suspends real audio on p
       ),
     )
     .toBe("suspended");
+  const tones = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { qracerAudioTest: { tones: unknown[] }[] }).qracerAudioTest[0]?.tones
+          .length ?? 0,
+    );
+  const before = await tones();
+  await page.getByRole("button", { name: "Sonido y comodidad" }).click();
+  await expect.poll(tones).toBeGreaterThan(before);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { qracerAudioTest: { context: AudioContext }[] }).qracerAudioTest[0]
+            ?.context.state,
+      ),
+    )
+    .toBe("suspended");
+  expect(await count()).toBe(1);
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("qracer.presentation.v1") ?? "{}"),
   );
