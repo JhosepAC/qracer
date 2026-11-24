@@ -34,7 +34,7 @@ test("plays practice and both timed modes with paused clocks and repeatable cate
   const summary = JSON.parse(await readFile(path, "utf8"));
   expect(summary.mode).toBe("practice");
   expect(summary.rulesVersion).toBe(2);
-  expect(summary.generatorVersion).toBe(2);
+  expect(summary.generatorVersion).toBe(3);
   expect(summary.integrity).toBe(3);
   expect(summary.impacts).toBeGreaterThanOrEqual(0);
   expect(JSON.stringify(summary)).not.toMatch(/token|sdp|candidate|orientation/i);

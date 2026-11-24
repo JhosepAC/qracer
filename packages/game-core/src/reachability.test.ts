@@ -2,7 +2,13 @@ import { expect, it } from "vitest";
 import { drive, driving, initialDriver, neutralInput } from "./driving.ts";
 import { laneCenters } from "./road.ts";
 import { difficultyAt, REACTION_SECONDS, validateRoute } from "./reachability.ts";
-import { advanceTraffic, openLane, TRAFFIC_LOOKAHEAD, trafficLateral } from "./traffic.ts";
+import {
+  advanceTraffic,
+  openLane,
+  TRAFFIC_LOOKAHEAD,
+  trafficLateral,
+  trafficPosition,
+} from "./traffic.ts";
 
 it("verifies 10,000 seeds across difficulty, stationary hazards and lateral traffic envelopes", () => {
   let moving = 0;
@@ -30,13 +36,8 @@ it("verifies 10,000 seeds across difficulty, stationary hazards and lateral traf
         kinds.add(car.kind ?? 0);
         if (car.targetD !== undefined) {
           moving++;
-          if (car.moveAt === undefined || car.moveAt < 2.15 * 60)
-            throw new Error("Missing announcement");
-          if (
-            trafficLateral(car, car.moveAt) !== car.d ||
-            trafficLateral(car, car.moveAt + 120) !== car.targetD
-          )
-            throw new Error("Unstable maneuver endpoints");
+          if (car.moveAt !== undefined)
+            throw new Error("Maneuver starts before entering visible range");
         }
       }
     }
@@ -72,4 +73,24 @@ it("uses the actual balance configuration and leaves an empty fallback when stee
   expect(
     advanceTraffic(world, 310, 0, 0, false, { ...driving, lateralSpeed: 0.01 }).rows[0]?.cars,
   ).toEqual([]);
+});
+
+it("announces lane changes only within low-profile visibility and waits the full reaction period", () => {
+  let world = advanceTraffic({ nextRow: 6, rows: [] }, 1, 3000, 0);
+  let candidate = world.rows.find((row) => row.cars.some((car) => car.targetD !== undefined));
+  for (let seed = 2; !candidate && seed < 100; seed++) {
+    world = advanceTraffic({ nextRow: 6, rows: [] }, seed, 3000, 0);
+    candidate = world.rows.find((row) => row.cars.some((car) => car.targetD !== undefined));
+  }
+  if (!candidate) throw new Error("Missing moving traffic fixture");
+  const car = candidate.cars[0];
+  if (!car) throw new Error("Missing car");
+  const pending = advanceTraffic(world, 1, trafficPosition(candidate, 600) - 161, 600);
+  expect(pending.rows[0]?.cars[0]?.moveAt).toBeUndefined();
+  const visible = advanceTraffic(pending, 1, trafficPosition(candidate, 601) - 159, 601);
+  const moving = visible.rows[0]?.cars[0];
+  if (!moving?.moveAt) throw new Error("Announcement not scheduled");
+  expect(moving.moveAt - 601).toBeGreaterThanOrEqual(REACTION_SECONDS * 60);
+  expect(trafficLateral(moving, moving.moveAt)).toBe(car.d);
+  expect(trafficLateral(moving, moving.moveAt + 120)).toBe(car.targetD);
 });
