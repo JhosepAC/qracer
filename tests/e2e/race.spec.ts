@@ -1,3 +1,4 @@
+import { openLane } from "../../packages/game-core/src/traffic.ts";
 import { expect, test } from "@playwright/test";
 
 const graphicsReady = { timeout: 20000 };
@@ -50,8 +51,9 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
   await expect(page.locator("#score")).toHaveText("0");
   await expect(page.locator("#integrity")).toHaveText("Integridad 3/3");
 
-  // Seed 310 includes cars on the right. Hold that lane to finish by impacts.
-  await page.keyboard.down("ArrowRight");
+  // Select an occupied outer lane independently of the versioned generator.
+  const occupiedSide = openLane(310) === 2 ? "ArrowLeft" : "ArrowRight";
+  await page.keyboard.down(occupiedSide);
   await page.keyboard.down("ArrowUp");
   await expect(page.getByRole("heading", { name: "Fin de carrera" })).toBeVisible({
     timeout: 95000,
@@ -59,7 +61,7 @@ test("plays a coastal race with keyboard, pauses safely and restarts from zero",
   await expect(page.locator("#summary")).toContainText(/\d+ puntos/);
   await expect(page.locator("#result-speed")).toHaveText(/\d+ km\/h/);
   await expect(page.locator("#result-distance")).toHaveText(/\d+ m/);
-  await page.keyboard.up("ArrowRight");
+  await page.keyboard.up(occupiedSide);
   await page.keyboard.up("ArrowUp");
   await page.screenshot({ path: info.outputPath("f03-results.png") });
   await page.getByRole("button", { name: "Reiniciar" }).click();

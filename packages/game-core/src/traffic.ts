@@ -1,9 +1,10 @@
-import { STEP_SECONDS } from "./driving.ts";
+import { difficultyAt, validateRoute } from "./reachability.ts";
+import { STEP_SECONDS, TICK_HZ } from "./driving.ts";
 import { laneCenters } from "./road.ts";
 
-export const GENERATOR_VERSION = 1;
+export const GENERATOR_VERSION = 2;
 export const ROW_SPACING = 160;
-export const TRAFFIC_LOOKAHEAD = 256;
+export const TRAFFIC_LOOKAHEAD = 360;
 export const TRAFFIC_SPEED = 10;
 const KEEP_BEHIND = 28;
 export const MAX_TRAFFIC_ROWS = 9;
@@ -13,6 +14,9 @@ export interface TrafficCar {
   readonly id: number;
   readonly d: number;
   readonly paint: number;
+  readonly kind?: 0 | 1 | 2;
+  readonly targetD?: number;
+  readonly moveAt?: number;
 }
 
 export interface TrafficRow {
@@ -25,6 +29,7 @@ export interface TrafficRow {
 export interface Traffic {
   readonly nextRow: number;
   readonly rows: readonly TrafficRow[];
+  readonly nextSpawn?: number;
 }
 
 export const emptyTraffic: Traffic = { nextRow: 1, rows: [] };
@@ -50,7 +55,14 @@ export function trafficPattern(seed: number, row: number): readonly TrafficCar[]
   const chosen = mask === 0 || mask & (1 << safeLane) ? safeMask : mask;
   return laneCenters.flatMap((d, lane) =>
     chosen & (1 << lane)
-      ? [{ id: row * 3 + lane, d, paint: randomWord(seed, row, 2 + lane) % 4 }]
+      ? [
+          {
+            id: row * 3 + lane,
+            d,
+            paint: randomWord(seed, row, 2 + lane) % 6,
+            kind: (randomWord(seed, row, 9 + lane) % 3) as 0 | 1 | 2,
+          },
+        ]
       : [],
   );
 }
@@ -59,30 +71,63 @@ export function trafficPosition(row: TrafficRow, tick: number): number {
   return row.hazard ? row.s : row.s + (tick - row.tick) * STEP_SECONDS * TRAFFIC_SPEED;
 }
 
-export function advanceTraffic(world: Traffic, seed: number, s: number, tick: number): Traffic {
+export function trafficLateral(car: TrafficCar, tick: number) {
+  if (car.targetD === undefined || car.moveAt === undefined) return car.d;
+  const t = Math.max(0, Math.min(1, (tick - car.moveAt) / (2 * TICK_HZ)));
+  return car.d + (car.targetD - car.d) * t * t * (3 - 2 * t);
+}
+
+export function advanceTraffic(
+  world: Traffic,
+  seed: number,
+  s: number,
+  tick: number,
+  practice = false,
+): Traffic {
   const rows = world.rows;
+  const nextSpawn = world.nextSpawn ?? 0;
   const onRoad = (row: TrafficRow) => trafficPosition(row, tick) >= s - KEEP_BEHIND;
-  if (world.nextRow * ROW_SPACING > s + TRAFFIC_LOOKAHEAD && rows.every(onRoad)) return world;
+  if (nextSpawn > s + TRAFFIC_LOOKAHEAD && rows.every(onRoad)) return world;
   const retained = rows.filter(onRoad);
-  let nextRow = world.nextRow;
-  while (nextRow * ROW_SPACING <= s + TRAFFIC_LOOKAHEAD && retained.length < MAX_TRAFFIC_ROWS) {
-    // After a capacity stall, never create cars within the already visible foreground.
-    const spawn =
-      retained.length === 0 && nextRow === 1
-        ? Math.max(s + ROW_SPACING, nextRow * ROW_SPACING)
-        : s + TRAFFIC_LOOKAHEAD;
-    const cars = trafficPattern(seed, nextRow);
-    const row = { s: spawn, tick, cars };
-    if (nextRow % 4 === 3) {
-      retained.push({
-        ...row,
-        cars: cars.slice(0, 1),
-        hazard: nextRow % 8 === 3 ? "cones" : "barrier",
-      });
-    } else {
-      retained.push(row);
-    }
-    nextRow++;
+  if (nextSpawn > s + TRAFFIC_LOOKAHEAD || retained.length >= MAX_TRAFFIC_ROWS)
+    return { ...world, rows: retained };
+  const row = world.nextRow;
+  const difficulty = difficultyAt(s, practice);
+  let cars = trafficPattern(seed, row);
+  const hazard =
+    row % difficulty.hazardEvery === 3
+      ? row % 8 === 3
+        ? ("cones" as const)
+        : ("barrier" as const)
+      : undefined;
+  if (hazard) cars = cars.slice(0, 1);
+  const safe = laneCenters[openLane(seed)] ?? 0;
+  const free = laneCenters.filter((d) => d !== safe);
+  if (
+    !hazard &&
+    difficulty.moving &&
+    cars.length === 1 &&
+    free.length === 2 &&
+    Math.abs((free[0] ?? 0) - (free[1] ?? 0)) === 4
+  ) {
+    const car = cars[0];
+    if (car)
+      cars = [
+        { ...car, targetD: free.find((d) => d !== car.d) ?? car.d, moveAt: tick + 6 * TICK_HZ },
+      ];
   }
-  return { rows: retained, nextRow };
+  const valid = validateRoute(
+    TRAFFIC_LOOKAHEAD,
+    safe,
+    cars.map((car) => ({ from: car.d, to: car.targetD ?? car.d, halfWidth: hazard ? 0.8 : 0.95 })),
+  ).valid;
+  // One bounded candidate, then a stationary safe fallback. Never retry random generation.
+  if (!valid)
+    cars = [{ id: row * 3, d: laneCenters[(openLane(seed) + 1) % 3] ?? 0, paint: 0, kind: 0 }];
+  retained.push({ s: s + TRAFFIC_LOOKAHEAD, tick, cars, ...(hazard ? { hazard } : {}) });
+  return {
+    rows: retained,
+    nextRow: row + 1,
+    nextSpawn: s + TRAFFIC_LOOKAHEAD + difficulty.spacing,
+  };
 }
