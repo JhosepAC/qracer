@@ -1,5 +1,8 @@
 import {
   AUTH_MS,
+  isTransport,
+  NEGOTIATION_BYTES,
+  type TransportFrame,
   type ClientFrame,
   type Creation,
   type DriveFrame,
@@ -23,6 +26,7 @@ export interface Peer {
   total?: number;
   driveControl?: number;
   drive?: DriveRate;
+  signalBytes?: number;
 }
 
 interface Pending {
@@ -45,6 +49,8 @@ export interface RoomState {
   pending?: Pending;
   controller?: { hash: string; id?: string; awayUntil?: number };
   ended?: ErrorCode;
+  route?: "wss" | "rtc";
+  switching?: { until: number; host: boolean; phone: boolean };
 }
 
 export interface Effect {
@@ -124,6 +130,7 @@ export class RoomSession {
     if (this.state.ended) return Infinity;
     let until = Math.min(
       this.until,
+      this.state.switching?.until ?? Infinity,
       this.state.pending?.until ?? Infinity,
       this.state.invite?.until ?? Infinity,
       this.state.controller?.awayUntil ?? Infinity,
@@ -175,7 +182,7 @@ export class RoomSession {
               until,
               linked,
             }
-          : { type: "STATE", phase, epoch, until, linked },
+          : { type: "STATE", phase, epoch, until, linked, route: this.state.route ?? "wss" },
       });
     if (pending)
       effects.push({
@@ -185,7 +192,14 @@ export class RoomSession {
     if (controller?.id)
       effects.push({
         id: controller.id,
-        frame: { type: "STATE", phase, epoch, until, linked: true },
+        frame: {
+          type: "STATE",
+          phase,
+          epoch,
+          until,
+          linked: true,
+          route: this.state.route ?? "wss",
+        },
       });
     return effects;
   }
@@ -205,6 +219,8 @@ export class RoomSession {
       delete state.controller.id;
       state.controller.awayUntil = now + RECONNECT_MS;
     } else return false;
+    state.route = "wss";
+    delete state.switching;
     return true;
   }
 
@@ -231,6 +247,13 @@ export class RoomSession {
   expire(now: number): Effect[] {
     const state = this.state;
     if (state.ended) return [];
+    if (state.switching && now >= state.switching.until) {
+      delete state.switching;
+      state.route = "wss";
+      state.epoch++;
+      this.revision++;
+      return this.stateEffects();
+    }
     if (now >= this.until)
       return this.end(
         now >= state.leaseUntil && state.leaseUntil < state.hardUntil
@@ -286,6 +309,10 @@ export class RoomSession {
       return [this.reject(id, "AUTH_REQUIRED"), ...this.remove(id, received)];
     if (message.type === "AUTH" && message.version !== SESSION_VERSION)
       return [this.reject(id, "VERSION_MISMATCH"), ...this.remove(id, received)];
+    if (isTransport(message)) {
+      const expired = this.expire(received);
+      return expired.concat(this.transport(peer, message, received));
+    }
     if ("epoch" in message) {
       if (message.type !== "INPUT") {
         peer.driveControl = (peer.driveControl ?? 0) + 1;
@@ -311,9 +338,64 @@ export class RoomSession {
     return expired.concat(effects);
   }
 
+  private transport(peer: Peer, frame: TransportFrame, now: number): Effect[] {
+    const state = this.state;
+    const { host, controller, epoch } = state;
+    if (
+      !host ||
+      !controller?.id ||
+      frame.epoch !== epoch ||
+      (peer.id !== host && peer.id !== controller.id) ||
+      !this.peers.has(peer.id)
+    )
+      return [];
+    if (++peer.count > 40) return [];
+    const fromHost = peer.id === host;
+    if (frame.type === "HEARTBEAT") return [{ id: peer.id, frame }];
+    if (frame.type === "SIGNAL") {
+      if (
+        state.route === "rtc" ||
+        (frame.kind === "offer" && !fromHost) ||
+        (frame.kind === "answer" && fromHost)
+      )
+        return [];
+      peer.signalBytes = (peer.signalBytes ?? 0) + new TextEncoder().encode(frame.payload).length;
+      if (peer.signalBytes > NEGOTIATION_BYTES / 2) return [];
+      return [{ id: fromHost ? controller.id : host, frame }];
+    }
+    if (frame.type === "FALLBACK") {
+      if (state.route !== "rtc" && !state.switching) return [];
+      state.route = "wss";
+      delete state.switching;
+      state.epoch++;
+    } else if (
+      frame.type === "TRANSPORT_REQUEST" &&
+      fromHost &&
+      frame.route === "rtc" &&
+      state.route !== "rtc" &&
+      !state.switching
+    ) {
+      state.switching = { until: now + 5000, host: false, phone: false };
+      this.revision++;
+      return [host, controller.id].map((id) => ({
+        id,
+        frame: { type: "TRANSPORT_PROPOSE", epoch, route: "rtc" },
+      }));
+    } else if (frame.type === "TRANSPORT_ACK" && frame.route === "rtc" && state.switching) {
+      state.switching[fromHost ? "host" : "phone"] = true;
+      this.revision++;
+      if (!state.switching.host || !state.switching.phone) return [];
+      delete state.switching;
+      state.route = "rtc";
+      state.epoch++;
+    } else return [];
+    this.revision++;
+    return this.stateEffects();
+  }
+
   private forward(peer: Peer, frame: DriveFrame, now: number): Effect[] {
     const { controller, host, epoch } = this.state;
-    if (!host || !controller?.id || frame.epoch !== epoch) return [];
+    if (!host || !controller?.id || frame.epoch !== epoch || this.state.route === "rtc") return [];
     const fromHost = peer.id === host;
     if (!fromHost && peer.id !== controller.id) return [];
     if (
@@ -364,6 +446,8 @@ export class RoomSession {
       state.controller = { hash: fresh.hash, id };
       state.epoch++;
     }
+    state.route = "wss";
+    delete state.switching;
     this.revision++;
     return [
       ...(message.role === "resume" && fresh

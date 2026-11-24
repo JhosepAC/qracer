@@ -1,3 +1,4 @@
+import { isTransport } from "@qracer/session-core/wire";
 import type { DriveFrame, ServerFrame } from "@qracer/session-core/wire";
 import qrcode from "qrcode-generator";
 import { controllerUrl, createSession, SessionLink, sessionError } from "./link.ts";
@@ -148,7 +149,7 @@ export function mountPairing(
       return;
     }
     if (frame.type !== "STATE") {
-      if ("epoch" in frame) driving.message(frame);
+      if ("epoch" in frame && !isTransport(frame)) driving.message(frame);
       return;
     }
     if (frame.phase === "connected")
