@@ -43,6 +43,9 @@ test("caches only allowlisted static resources and reopens the real game offline
     await page.locator("#start").click();
     await expect(page.locator("#app")).toHaveAttribute("data-mode", "playing");
     await page.keyboard.press("Escape");
+    await page.locator("#return-menu").click();
+    await page.locator("#run-biome").selectOption("desert");
+    await expect(page.locator("#graphics-status")).toContainText("Este entorno no está descargado");
     expect(await page.evaluate(async () => (await fetch("/assets/world/desert.glb")).status)).toBe(
       503,
     );

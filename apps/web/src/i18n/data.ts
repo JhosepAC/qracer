@@ -1,4 +1,39 @@
 export const dataEnglish: Readonly<Record<string, string>> = {
+  "Actualización en curso. La carrera estará disponible enseguida.":
+    "Update in progress. Racing will be available shortly.",
+  "Jugar sin conexión": "Play offline",
+  "Teclado sin Internet tras descargar el circuito. Vincular un móvil requiere relay y red disponibles.":
+    "Keyboard without Internet after downloading the course. Pairing a phone requires an available relay and network.",
+  "Preparar juego sin conexión": "Prepare offline play",
+  "Descargar todos los entornos": "Download all environments",
+  "Aplicar actualización": "Apply update",
+  "Sin conexión requiere HTTPS de confianza o localhost. Puedes seguir jugando con red.":
+    "Offline play requires trusted HTTPS or localhost. You can keep playing online.",
+  "Descargas desactivadas. Tu progreso se conserva.":
+    "Downloads disabled. Your progress is preserved.",
+  "Circuito costero disponible sin conexión con teclado.":
+    "Coastal course available offline with keyboard.",
+  "Descarga pendiente. Mantén la red hasta que el circuito esté disponible.":
+    "Download pending. Stay online until the course is available.",
+  "Desierto descargado": "Desert downloaded",
+  "Desierto no descargado": "Desert not downloaded",
+  "Ciudad descargada": "City downloaded",
+  "Ciudad no descargada": "City not downloaded",
+  "No se pudo preparar la descarga. Puedes jugar con red y reintentar.":
+    "Could not prepare the download. You can play online and retry.",
+  "Preparando descarga…": "Preparing download…",
+  "No se pudo completar la descarga. Revisa la red y el espacio del navegador.":
+    "Could not complete the download. Check your network and browser storage.",
+  "Vuelve al menú en las otras pestañas de PC o ciérralas antes de actualizar.":
+    "Return to the menu in other PC tabs or close them before updating.",
+  "Borrar descargas": "Delete downloads",
+  "Se eliminará el juego descargado sin borrar progreso ni ajustes. Podrás prepararlo de nuevo con conexión.":
+    "Downloaded game content will be removed without deleting progress or preferences. You can prepare it again online.",
+  "Descargas borradas. Tu progreso se conserva.": "Downloads deleted. Your progress is preserved.",
+  "Sin Internet, usa teclado o la edición con relay local en tu red.":
+    "Without Internet, use keyboard or the edition with a local relay on your network.",
+  "Este entorno no está descargado. Elige Costa o descarga los entornos con conexión.":
+    "This environment is not downloaded. Choose Coast or download environments online.",
   "Descargar tarjeta PNG": "Download PNG card",
   "Compartir tarjeta": "Share card",
   "Preparando tarjeta…": "Preparing card…",

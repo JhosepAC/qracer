@@ -1,3 +1,4 @@
+import { clearDownloads } from "../offline/client.ts";
 import { progressStore } from "../storage/database.ts";
 import { categoryInfo, DataFault, MAX_IMPORT } from "../storage/model.ts";
 import { exportProgress, parseProgress } from "../storage/transfer.ts";
@@ -22,6 +23,7 @@ export function mountDataMenu(onOpen: () => void) {
     <details><summary>Récords locales</summary><div id="data-records"></div></details>
     <details><summary>Últimas partidas</summary><div id="data-history"></div></details>
     <button type="button" id="data-reset">Borrar progreso y fantasmas</button>
+    <button type="button" id="data-cache">Borrar descargas</button>
     <button type="button" id="data-preferences">Restablecer ajustes de PC</button>
     <button type="submit">Cerrar datos</button></form>`;
   document.body.append(dialog);
@@ -159,6 +161,19 @@ export function mountDataMenu(onOpen: () => void) {
         return;
       await progressStore.reset();
       status.textContent = "Progreso borrado.";
+    });
+  };
+  field("data-cache").onclick = () => {
+    void run(async () => {
+      if (
+        !(await confirmAction(
+          "Borrar descargas",
+          "Se eliminará el juego descargado sin borrar progreso ni ajustes. Podrás prepararlo de nuevo con conexión.",
+        ))
+      )
+        return;
+      await clearDownloads();
+      status.textContent = "Descargas borradas. Tu progreso se conserva.";
     });
   };
   field("data-preferences").onclick = () => {
