@@ -3,6 +3,23 @@ import { offlineServer } from "./offline-server.ts";
 
 test.use({ serviceWorkers: "allow" });
 
+test("prepares and reopens offline play through the production local relay", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/play/");
+  await expect(page.locator("#offline-status")).toContainText("disponible sin conexión", {
+    timeout: 30000,
+  });
+  expect(
+    await page.evaluate(async () => (await fetch("/LICENSE.txt")).headers.get("content-type")),
+  ).toContain("text/plain");
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator("#start")).toBeEnabled();
+  await context.setOffline(false);
+});
+
 test("downloads optional worlds and clears only game downloads after confirmation", async ({
   page,
   context,
