@@ -74,7 +74,7 @@ test("keeps race controls disabled when a model fails and recovers on reload", a
   await page.addInitScript(() => localStorage.setItem("qracer.graphics.quality", "low"));
   await page.route("**/assets/coast/coupe.glb", (route) => route.abort());
   await page.goto("/play/");
-  await expect(page.getByRole("status")).toContainText("No se pudo cargar el circuito");
+  await expect(page.locator("#graphics-status")).toContainText("No se pudo cargar el circuito");
   await expect(page.getByRole("button", { name: "Salir a pista" })).toBeDisabled();
   await expect(page.getByRole("link", { name: "Conocer el mando" })).toBeVisible();
   await page.unroute("**/assets/coast/coupe.glb");
