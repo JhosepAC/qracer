@@ -199,3 +199,45 @@ it("protects the host's revocation budget from driving traffic", async () => {
     frame: { type: "ERROR", code: "REVOKED" },
   });
 });
+
+it("commits RTC only after both ACKs and rejects the previous path and epoch", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  await s.link(phone);
+  expect(await s.send(phone, { type: "TRANSPORT_REQUEST", epoch: 1, route: "rtc" })).toEqual([]);
+  expect(await s.send(s.host, { type: "SIGNAL", epoch: 1, kind: "answer", payload: "{}" })).toEqual(
+    [],
+  );
+  expect(
+    await s.send(s.host, { type: "SIGNAL", epoch: 1, kind: "offer", payload: "{}" }),
+  ).toHaveLength(1);
+  expect(await s.send(s.host, { type: "TRANSPORT_REQUEST", epoch: 1, route: "rtc" })).toHaveLength(
+    2,
+  );
+  await s.send(s.host, { type: "TRANSPORT_ACK", epoch: 1, route: "rtc" });
+  expect(s.room.state.epoch).toBe(1);
+  const committed = await s.send(phone, { type: "TRANSPORT_ACK", epoch: 1, route: "rtc" });
+  expect(committed).toMatchObject([
+    { frame: { epoch: 2, route: "rtc" } },
+    { frame: { epoch: 2, route: "rtc" } },
+  ]);
+  expect(await s.send(phone, { type: "DRIVE_PAUSE", epoch: 2, seq: 1 })).toEqual([]);
+  expect(await s.send(phone, { type: "FALLBACK", epoch: 1 })).toEqual([]);
+  await s.send(phone, { type: "FALLBACK", epoch: 2 });
+  expect(s.room.state).toMatchObject({ epoch: 3, route: "wss" });
+  expect(await s.send(phone, { type: "DRIVE_PAUSE", epoch: 3, seq: 2 })).toHaveLength(1);
+});
+
+it("expires an unacknowledged switch and persists the WSS recovery epoch", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  await s.link(phone);
+  await s.send(s.host, { type: "TRANSPORT_REQUEST", epoch: 1, route: "rtc" });
+  s.jump(5001);
+  const restored = new RoomSession(JSON.parse(JSON.stringify(s.room.state)), s.room.peers.values());
+  expect(restored.expire(s.now())).toHaveLength(2);
+  expect(restored.state).toMatchObject({ epoch: 2, route: "wss" });
+  expect(restored.state.switching).toBeUndefined();
+});
