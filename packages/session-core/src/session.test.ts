@@ -241,3 +241,19 @@ it("expires an unacknowledged switch and persists the WSS recovery epoch", async
   expect(restored.state).toMatchObject({ epoch: 2, route: "wss" });
   expect(restored.state.switching).toBeUndefined();
 });
+
+it("does not spend the host revocation budget on RTC signaling", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  await s.link(phone);
+  s.jump(1001);
+  for (let i = 0; i < 12; i++)
+    await s.send(s.host, { type: "SIGNAL", epoch: 1, kind: "candidate", payload: "{}" });
+  const revoked = await s.send(s.host, { type: "REVOKE" });
+  expect(revoked.find((effect) => effect.id === phone)).toMatchObject({
+    frame: { code: "REVOKED" },
+    close: true,
+  });
+  expect(s.room.state.host).toBe(s.host);
+});

@@ -20,6 +20,10 @@ test("pairs by pasted link, consumes the QR, reconnects and approves replacement
     isMobile: true,
     hasTouch: true,
   });
+  for (const context of [page.context(), handset, secondHandset])
+    await context.addInitScript(() => {
+      delete (window as unknown as Record<string, unknown>).RTCPeerConnection;
+    });
   try {
     await page.goto("/play/");
     await page.getByRole("button", { name: "Conectar móvil" }).click();
