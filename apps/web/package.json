@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build && node ../../scripts/web-notices.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "build": "vite build && node ../../scripts/web-notices.mjs && node ../../scripts/offline-build.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json"
   },
   "dependencies": {
     "@qracer/game-core": "workspace:*",
