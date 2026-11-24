@@ -2,8 +2,8 @@
 
 Juego arcade 3D para navegador de PC, controlado desde un teléfono mediante un código QR. El mando web funciona sin instalar una aplicación; gráficos, conexión y controles cuentan con alternativas según las capacidades del dispositivo.
 
-**Estado:** la carrera costera se puede jugar con teclado o con un móvil
-vinculado. El mando incluye inclinación, volante táctil, botones y
+**Estado:** tres ambientes (costa, desierto y ciudad nocturna) y cuatro modos
+se pueden jugar con teclado o con un móvil vinculado. El mando incluye inclinación, volante táctil, botones y
 pausa segura al perder la entrada. El laboratorio F02 de sensores, relay y
 rendimiento sigue en validación.
 Instrucciones del laboratorio en [PROBES.md](PROBES.md).
@@ -94,6 +94,27 @@ pantalla activa dependen del navegador.
 En loopback la PC permite probar el enlace en otro navegador local. Para
 mostrar un QR que el teléfono pueda abrir, entra en la PC por su IP LAN.
 La invitación es de un solo uso. Caduca como máximo a los dos minutos.
+
+## Modos, ambientes y pinturas
+
+En el menú puedes elegir **Infinito**, **Práctica**, **Contrarreloj** o
+**Desafío diario**, además del ambiente inicial y una semilla. Contrarreloj y
+diario duran hasta 120 segundos de simulación; pausar detiene el reloj. El
+diario deriva su semilla de la fecha UTC y las versiones de reglas/generador;
+es recreativo y no usa una clasificación global.
+
+Práctica mantiene la integridad y permite **Terminar práctica**. No concede
+récords ni pinturas. Los otros modos permiten completar objetivos y desbloquear
+seis pinturas con idénticas prestaciones. Progreso, medallas y récords actuales
+se conservan mientras la pestaña siga abierta. La persistencia duradera y el
+fantasma corresponden a una fase posterior.
+
+Las categorías de récord separan modo, semilla, versiones, configuración y
+ayudas. Los entornos cambian durante el recorrido y se descargan por adelantado.
+Los intermitentes ámbar anuncian las maniobras del tráfico. En resultados puedes
+**Guardar resumen de carrera** con tiempos, maniobras, impactos y reglas, para
+compartir voluntariamente observaciones sin historial de sensores o credenciales. Si falta un entorno,
+la partida pausa antes de continuar y permite volver al menú para reintentar.
 
 ## Transporte directo y recuperación
 

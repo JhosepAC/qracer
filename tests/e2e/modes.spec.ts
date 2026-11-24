@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("plays practice and both timed modes with paused clocks and repeatable categories", async ({
@@ -25,6 +26,18 @@ test("plays practice and both timed modes with paused clocks and repeatable cate
   await expect(page.locator("#run-hud")).toContainText("Práctica");
   await page.getByRole("button", { name: "Terminar práctica" }).click();
   await expect(page.locator("#run-result")).toContainText("Sin récord competitivo");
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Guardar resumen de carrera" }).click();
+  const download = await downloadEvent;
+  const path = await download.path();
+  if (!path) throw new Error("Missing run summary");
+  const summary = JSON.parse(await readFile(path, "utf8"));
+  expect(summary.mode).toBe("practice");
+  expect(summary.rulesVersion).toBe(2);
+  expect(summary.generatorVersion).toBe(2);
+  expect(summary.integrity).toBe(3);
+  expect(summary.impacts).toBeGreaterThanOrEqual(0);
+  expect(JSON.stringify(summary)).not.toMatch(/token|sdp|candidate|orientation/i);
   await page.getByRole("button", { name: "Elegir otro recorrido" }).click();
   for (const mode of ["time-trial", "daily"]) {
     await page.locator("#run-mode").selectOption(mode);

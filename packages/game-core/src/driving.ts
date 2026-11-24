@@ -4,6 +4,7 @@ export const STEP_SECONDS = 1 / TICK_HZ;
 export const ROAD_HALF_WIDTH = 6;
 
 export interface DriveInput {
+  readonly assist?: boolean;
   readonly steer: number;
   readonly throttle: number;
   readonly brake: number;

@@ -45,6 +45,8 @@ export interface Race {
   readonly nearMisses: number;
   readonly bonus: number;
   readonly score: number;
+  readonly impacts: number;
+  readonly grazes: number;
   readonly topSpeed: number;
   readonly events: readonly RaceEvent[];
 }
@@ -67,7 +69,14 @@ export function createRace(
     seed: seed | 0,
     config: Object.freeze({ ...config }),
     driver,
-    traffic: advanceTraffic(emptyTraffic, seed, 0, 0),
+    traffic: advanceTraffic(
+      emptyTraffic,
+      seed,
+      0,
+      0,
+      run.mode === "practice" || run.assisted,
+      config,
+    ),
     encounters: new Map(),
     protectedUntil: 0,
     comboUntil: 0,
@@ -76,6 +85,8 @@ export function createRace(
     nearMisses: 0,
     bonus: 0,
     score: 0,
+    impacts: 0,
+    grazes: 0,
     topSpeed: 0,
     events: noEvents,
   };
@@ -83,6 +94,15 @@ export function createRace(
 
 export function stepRace(state: Race, input: DriveInput): Race {
   if (state.phase === "finished") return state;
+  if (input.assist && !state.run.assisted)
+    state = {
+      ...state,
+      run: {
+        ...state.run,
+        assisted: true,
+        category: state.run.category.replace(/standard$/, "assisted"),
+      },
+    };
   if (state.phase === "countdown") {
     const countdown = state.countdown - 1;
     return { ...state, countdown, phase: countdown === 0 ? "racing" : "countdown" };
@@ -161,7 +181,8 @@ export function stepRace(state: Race, input: DriveInput): Race {
     state.seed,
     motion.s,
     tick,
-    state.run.mode === "practice",
+    state.run.mode === "practice" || state.run.assisted,
+    config,
   );
   let encounters = changes ?? state.encounters;
   if (traffic !== state.traffic && encounters.size > 0) {
@@ -188,6 +209,8 @@ export function stepRace(state: Race, input: DriveInput): Race {
     nearMisses,
     bonus,
     score: Math.floor(motion.s) + 100 * overtakes + bonus,
+    impacts: state.impacts + (events?.filter((event) => event.type === "impact").length ?? 0),
+    grazes: state.grazes + (events?.filter((event) => event.type === "graze").length ?? 0),
     topSpeed: Math.max(state.topSpeed, motion.speed),
     events: events ?? noEvents,
   };

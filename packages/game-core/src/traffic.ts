@@ -1,5 +1,5 @@
 import { difficultyAt, validateRoute } from "./reachability.ts";
-import { STEP_SECONDS, TICK_HZ } from "./driving.ts";
+import { STEP_SECONDS, TICK_HZ, driving, type DrivingConfig } from "./driving.ts";
 import { laneCenters } from "./road.ts";
 
 export const GENERATOR_VERSION = 2;
@@ -83,6 +83,7 @@ export function advanceTraffic(
   s: number,
   tick: number,
   practice = false,
+  config: DrivingConfig = driving,
 ): Traffic {
   const rows = world.rows;
   const nextSpawn = world.nextSpawn ?? 0;
@@ -120,10 +121,10 @@ export function advanceTraffic(
     TRAFFIC_LOOKAHEAD,
     safe,
     cars.map((car) => ({ from: car.d, to: car.targetD ?? car.d, halfWidth: hazard ? 0.8 : 0.95 })),
+    config,
   ).valid;
-  // One bounded candidate, then a stationary safe fallback. Never retry random generation.
-  if (!valid)
-    cars = [{ id: row * 3, d: laneCenters[(openLane(seed) + 1) % 3] ?? 0, paint: 0, kind: 0 }];
+  // One bounded candidate, then an empty safe fallback. Never retry random generation.
+  if (!valid) cars = [];
   retained.push({ s: s + TRAFFIC_LOOKAHEAD, tick, cars, ...(hazard ? { hazard } : {}) });
   return {
     rows: retained,

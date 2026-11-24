@@ -50,3 +50,10 @@ it("practice cannot grant records or paints and finished runs award only once", 
   ).toBe(emptyProgress);
   expect(awardRun(emptyProgress, "unfinished", createRace())).toBe(emptyProgress);
 });
+
+it("keeps assisted results separate even when the aid is turned off before finishing", () => {
+  const first = stepRace(createRace(), { ...neutralInput, assist: true });
+  const next = stepRace(first, neutralInput);
+  expect(next.run.assisted).toBe(true);
+  expect(next.run.category).toMatch(/assisted$/);
+});
