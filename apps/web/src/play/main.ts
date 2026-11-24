@@ -393,6 +393,7 @@ async function mount() {
     attempt.abort();
   }, 15000);
   try {
+    await runMenu.ready;
     const { createRaceView } = await import("./race-view.ts");
     attempt.signal.throwIfAborted();
     progress.value = 1;
