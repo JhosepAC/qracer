@@ -1,3 +1,4 @@
+import { mountLocale } from "../i18n/locale.ts";
 import { keyboardInput, isDrivingKey } from "./keyboard.ts";
 import { RaceAudio } from "./audio.ts";
 import { mountPresentation } from "./presentation.ts";
@@ -550,3 +551,5 @@ window.addEventListener("pageshow", (event) => {
   if (event.persisted) void mount();
 });
 void mount();
+
+mountLocale();

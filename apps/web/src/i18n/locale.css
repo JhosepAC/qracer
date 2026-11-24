@@ -1,0 +1,20 @@
+.locale-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f3f6f3;
+  font:
+    400 0.9rem Barlow,
+    sans-serif;
+}
+.locale-picker select {
+  min-height: 48px;
+  max-width: 100%;
+  border: 1px solid #819699;
+  border-radius: 4px;
+  padding: 0.5rem;
+  font: inherit;
+  color: #f3f6f3;
+  background: #10171b;
+}
