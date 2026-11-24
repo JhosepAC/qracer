@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -61,4 +62,20 @@ export async function offlineServer() {
         server.close(() => done());
       }),
   };
+}
+
+/** Deterministic simulation time on software GPU runners; render/cache remain real. */
+export async function prepareGraphics(page: Page) {
+  await page.setViewportSize({ width: 480, height: 320 });
+  await page.addInitScript(() => {
+    localStorage.setItem("qracer.graphics.quality", "low");
+    localStorage.setItem("qracer.presentation.v1", JSON.stringify({ muted: true }));
+    const request = window.requestAnimationFrame.bind(window);
+    let time = 0;
+    window.requestAnimationFrame = (callback) =>
+      request(() => {
+        time += 1000 / 12;
+        callback(time);
+      });
+  });
 }

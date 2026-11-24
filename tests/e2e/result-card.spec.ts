@@ -1,9 +1,11 @@
+import { prepareGraphics } from "./offline-server.ts";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("downloads a local PNG, regenerates its locale and handles optional sharing failures", async ({
   page,
 }, info) => {
+  await prepareGraphics(page);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "canShare", { value: () => true });
     Object.defineProperty(navigator, "share", {

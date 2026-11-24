@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { offlineServer } from "./offline-server.ts";
+import { offlineServer, prepareGraphics } from "./offline-server.ts";
 
 test.use({ serviceWorkers: "allow" });
 
@@ -8,13 +8,9 @@ test("caches only allowlisted static resources and reopens the real game offline
   context,
 }) => {
   test.setTimeout(60000);
+  await prepareGraphics(page);
   const server = await offlineServer();
   try {
-    await page.addInitScript(() => {
-      localStorage.setItem("qracer.graphics.quality", "low");
-      localStorage.setItem("qracer.presentation.v1", JSON.stringify({ muted: true }));
-    });
-    await page.setViewportSize({ width: 480, height: 320 });
     await page.goto(`${server.origin}/play/`);
     await page.evaluate(async () => {
       await navigator.serviceWorker.register("/sw.js");
@@ -39,7 +35,7 @@ test("caches only allowlisted static resources and reopens the real game offline
     expect(cached.join(" ")).not.toMatch(/session|health|token=|controller|probe/);
     await context.setOffline(true);
     await page.reload();
-    await expect(page.locator("#start")).toBeEnabled();
+    await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
     await page.locator("#start").click();
     await expect(page.locator("#app")).toHaveAttribute("data-mode", "playing");
     await page.keyboard.press("Escape");

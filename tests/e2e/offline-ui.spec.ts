@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { offlineServer } from "./offline-server.ts";
+import { offlineServer, prepareGraphics } from "./offline-server.ts";
 
 test.use({ serviceWorkers: "allow" });
+test.setTimeout(60000);
+test.beforeEach(async ({ page }) => {
+  await prepareGraphics(page);
+});
 
 test("prepares and reopens offline play through the production local relay", async ({
   page,
@@ -16,7 +20,7 @@ test("prepares and reopens offline play through the production local relay", asy
   ).toContain("text/plain");
   await context.setOffline(true);
   await page.reload();
-  await expect(page.locator("#start")).toBeEnabled();
+  await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
   await context.setOffline(false);
 });
 
@@ -28,7 +32,9 @@ test("downloads optional worlds and clears only game downloads after confirmatio
   try {
     await page.goto(`${server.origin}/play/`);
     await page.locator("#offline-menu summary").click();
-    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión");
+    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión", {
+      timeout: 20000,
+    });
     await page.locator("#offline-download").click();
     await expect(page.locator("#offline-worlds")).toHaveText(
       "Desierto descargado · Ciudad descargada",
@@ -88,10 +94,12 @@ test("downloads optional worlds and clears only game downloads after confirmatio
     await page.getByRole("button", { name: "Cerrar datos", exact: true }).click();
     await page.locator("#offline-menu summary").click();
     await page.locator("#offline-prepare").click();
-    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión");
+    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión", {
+      timeout: 20000,
+    });
     await context.setOffline(true);
     await page.reload();
-    await expect(page.locator("#start")).toBeEnabled();
+    await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
   } finally {
     await context.setOffline(false);
     await server.close();
@@ -105,6 +113,7 @@ test("waits for all PC tabs to reach the menu before activating and reloading", 
   test.setTimeout(60000);
   const server = await offlineServer();
   const second = await context.newPage();
+  await prepareGraphics(second);
   try {
     await context.addInitScript(() => {
       sessionStorage.setItem(
@@ -115,7 +124,9 @@ test("waits for all PC tabs to reach the menu before activating and reloading", 
       localStorage.setItem("qracer.presentation.v1", JSON.stringify({ muted: true }));
     });
     await page.goto(`${server.origin}/play/`);
-    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 20000 })
+      .toBe(true);
     await second.goto(`${server.origin}/play/`);
     await page.locator("#start").click();
     const initial = await page.evaluate(() => sessionStorage.getItem("f10-loads"));
@@ -175,7 +186,7 @@ test("keeps keyboard play working when service-worker registration is denied", a
       Promise.reject(new DOMException("denied", "SecurityError"));
   });
   await page.goto("/play/");
-  await expect(page.locator("#start")).toBeEnabled();
+  await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
   await expect(page.locator("#offline-status")).toContainText("Puedes jugar con red");
   await page.locator("#start").click();
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "playing");
@@ -188,7 +199,9 @@ test("evicts optional downloads on cache quota failure and preserves the essenti
   const server = await offlineServer();
   try {
     await page.goto(`${server.origin}/play/`);
-    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 20000 })
+      .toBe(true);
     const active = context
       .serviceWorkers()
       .find((worker) => worker.url() === `${server.origin}/sw.js`);
@@ -222,8 +235,10 @@ test("evicts optional downloads on cache quota failure and preserves the essenti
     );
     await context.setOffline(true);
     await page.reload();
-    await expect(page.locator("#start")).toBeEnabled();
-    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión");
+    await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
+    await expect(page.locator("#offline-status")).toContainText("disponible sin conexión", {
+      timeout: 20000,
+    });
   } finally {
     await context.setOffline(false);
     await server.close();
