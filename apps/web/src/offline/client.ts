@@ -7,6 +7,7 @@ export const supported = isSecureContext && "serviceWorker" in navigator && "cac
 let registration: ServiceWorkerRegistration | undefined;
 let owned = "";
 let started = false;
+const updateFound = () => registration?.installing?.addEventListener("statechange", changed);
 export function offlineEnabled() {
   try {
     return localStorage.getItem(enabledKey) !== "false";
@@ -107,13 +108,13 @@ export async function connectOffline() {
       else changed();
     });
   }
-  registration = await navigator.serviceWorker.register("/sw.js", {
+  const next = await navigator.serviceWorker.register("/sw.js", {
     scope: "/",
     updateViaCache: "none",
   });
-  registration.addEventListener("updatefound", () => {
-    registration?.installing?.addEventListener("statechange", changed);
-  });
+  if (registration !== next) registration?.removeEventListener("updatefound", updateFound);
+  registration = next;
+  registration.addEventListener("updatefound", updateFound);
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Offline install timeout")), 20000);
     void navigator.serviceWorker.ready.then(() => {
@@ -162,6 +163,7 @@ export async function clearDownloads() {
     (supported ? await navigator.serviceWorker.getRegistration("/sw.js") : undefined);
   for (const target of [current?.waiting, current?.active])
     if (target) await rpc(target, "DISABLE", 5000).catch(() => undefined);
+  current?.removeEventListener("updatefound", updateFound);
   await current?.unregister();
   if (supported)
     for (const name of await caches.keys())
