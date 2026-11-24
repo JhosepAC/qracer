@@ -1,3 +1,4 @@
+import { mountResultCard, snapshot } from "./result-card.ts";
 import { mountDataMenu } from "./data-menu.ts";
 import { mountLocale } from "../i18n/locale.ts";
 import { keyboardInput, isDrivingKey } from "./keyboard.ts";
@@ -101,6 +102,7 @@ pair.onclick = async () => {
   }
 };
 
+const card = mountResultCard();
 const sound = new RaceAudio();
 const presentation = mountPresentation(sound, () => {
   if (!clock.paused || resumeUntil) stop();
@@ -216,7 +218,9 @@ function stop(finished = false, reason = "") {
   keys.clear();
   cancelAnimationFrame(raf);
   if (!contextLost && !document.hidden) view?.draw(clock.current, clock.current, 0);
+  const image = finished ? snapshot(view?.canvas) : undefined;
   updateHud();
+  if (!finished) card.clear();
   root?.setAttribute("data-mode", finished ? "results" : "paused");
   element("overlay").hidden = false;
   pause.hidden = true;
@@ -230,6 +234,7 @@ function stop(finished = false, reason = "") {
   element("run-result").hidden = !finished;
   element("download-run").hidden = !finished;
   if (finished) {
+    card.show(result, assisted, image ?? Promise.resolve(null));
     element("run-result").textContent = runMenu.finish(result, assisted);
     element("result-distance").textContent = `${Math.floor(result.driver.s)} m`;
     element("result-speed").textContent = `${Math.round(result.topSpeed * 3.6)} km/h`;
@@ -276,6 +281,7 @@ function run(reset: boolean) {
     (source === "mobile" && !remote.ready(performance.now()))
   )
     return;
+  card.clear();
   if (reset) {
     clock.reset(runMenu.create());
     if (root) {
@@ -493,6 +499,7 @@ element("finish-practice").onclick = () => {
   stop(true);
 };
 element("return-menu").onclick = () => {
+  card.clear();
   sound.setActive(false);
   clock.pause();
   keys.clear();
