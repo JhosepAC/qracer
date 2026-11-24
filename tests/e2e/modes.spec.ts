@@ -53,7 +53,7 @@ test("plays practice and both timed modes with paused clocks and repeatable cate
     await expect(page.getByRole("heading", { name: "Fin de carrera" })).toBeVisible({
       timeout: 20000,
     });
-    await expect(page.locator("#run-result")).toContainText("Récord de esta sesión");
+    await expect(page.locator("#run-result")).toContainText("Récord local");
     await page.getByRole("button", { name: "Reiniciar", exact: true }).click();
     await expect(page.locator("#app")).toHaveAttribute("data-run-category", category ?? "");
     await page.keyboard.press("Escape");

@@ -1,4 +1,13 @@
 export const playEnglish: Readonly<Record<string, string>> = {
+  "Progreso guardado en este navegador.": "Progress saved in this browser.",
+  "Almacenamiento no disponible. Esta partida continúa en memoria.":
+    "Storage unavailable. This run continues in memory.",
+  "Se aislaron datos dañados y se recuperaron valores seguros.":
+    "Damaged data was isolated and safe defaults restored.",
+  "Datos de una versión nueva: se conservan sin sobrescribir. Esta pestaña usa memoria.":
+    "Data from a newer version is preserved without overwriting. This tab uses memory.",
+  "Progreso local en este navegador. El modo privado o borrar datos puede eliminarlo. Las pinturas son cosméticas.":
+    "Local progress in this browser. Private mode or clearing browser data can remove it. Paints are cosmetic.",
   Circuito: "Drive",
   costero: "the coast",
   "del desierto": "the desert",

@@ -1,8 +1,8 @@
+import { progressStore } from "../storage/database.ts";
+import { addResult, summarize, newRunId } from "../storage/model.ts";
 import {
-  awardRun,
   createRace,
   driving,
-  emptyProgress,
   MODES,
   objectives,
   PAINTS,
@@ -33,9 +33,10 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
       <label>Semilla<input id="run-seed" type="number" min="-2147483648" max="2147483647" step="1" value="310"></label>
       <label>Pintura<select id="run-paint"></select></label>
     </div>
+    <p id="storage-status" class="fine-print" role="status"></p>
     <p id="run-description" class="fine-print"></p>
     <details><summary>Objetivos y pinturas</summary><div id="run-objectives"></div>
-      <p class="fine-print">Progreso y récords de esta sesión. Se conservan mientras esta pestaña siga abierta. Las pinturas son cosméticas.</p>
+      <p class="fine-print">Progreso local en este navegador. El modo privado o borrar datos puede eliminarlo. Las pinturas son cosméticas.</p>
     </details>`;
   root.querySelector(".race-menu > section")?.append(shell);
   const field = <T extends HTMLElement>(id: string) => {
@@ -48,8 +49,8 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
   const seed = field<HTMLInputElement>("run-seed");
   const paint = field<HTMLSelectElement>("run-paint");
   const description = field("run-description");
-  let progress = emptyProgress;
-  let runId = 0;
+  let progress = progressStore.data.progress;
+  let runId = newRunId();
   function currentMode(): Mode {
     return MODES.find((key) => key === mode.value) ?? "infinite";
   }
@@ -97,15 +98,30 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
     redraw();
     changed();
   };
+  const refresh = () => {
+    progress = progressStore.data.progress;
+    field("storage-status").textContent = {
+      saved: "Progreso guardado en este navegador.",
+      memory: "Almacenamiento no disponible. Esta partida continúa en memoria.",
+      corrupt: "Se aislaron datos dañados y se recuperaron valores seguros.",
+      future:
+        "Datos de una versión nueva: se conservan sin sobrescribir. Esta pestaña usa memoria.",
+    }[progressStore.status];
+    root.dataset.storage = progressStore.status;
+    redraw();
+  };
+  progressStore.subscribe(refresh);
+  const ready = progressStore.ready.then(refresh);
   redraw();
   return {
+    ready,
     biome: currentBiome,
     paint: () =>
       unlockedPaints(progress)[Number(paint.value)]
         ? (paintColors[Number(paint.value)] ?? paintColors[0] ?? 0xffcb47)
         : 0xffcb47,
     create() {
-      runId++;
+      runId = newRunId();
       const value = Number(seed.value);
       return createRace(
         Number.isSafeInteger(value) && value >= -2147483648 && value <= 2147483647 ? value : 310,
@@ -122,12 +138,14 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
           }
         : race.run;
       const before = unlockedPaints(progress);
-      progress = awardRun(progress, String(runId), { ...race, run });
+      const row = summarize(runId, { ...race, run });
+      progress = addResult({ ...progressStore.data, progress }, row).progress;
+      void progressStore.commit(row);
       const unlocked = PAINTS.filter(
         (_, index) => !before[index] && unlockedPaints(progress)[index],
       );
       redraw();
-      return `${modeNames[run.mode]}${run.day ? ` · ${run.day} UTC` : ""} · ${run.competitive ? `Récord de esta sesión: ${progress.records[run.category] ?? 0}` : "Sin récord competitivo"}${unlocked.length ? ` · Pinturas nuevas: ${unlocked.join(", ")}` : ""}`;
+      return `${modeNames[run.mode]}${run.day ? ` · ${run.day} UTC` : ""} · ${run.competitive ? `Récord local: ${progress.records[run.category] ?? 0}` : "Sin récord competitivo"}${unlocked.length ? ` · Pinturas nuevas: ${unlocked.join(", ")}` : ""}`;
     },
   };
 }

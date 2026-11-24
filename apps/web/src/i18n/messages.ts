@@ -7,7 +7,7 @@ const dynamic: readonly [RegExp, (match: RegExpMatchArray) => string][] = [
   [/^Integridad (\d+\/\d+)$/, (m) => `Integrity ${m[1]}`],
   [/^(\d+) puntos$/, (m) => `${m[1]} points`],
   [/^Caduca en (\d+:\d{2})$/, (m) => `Expires in ${m[1]}`],
-  [/^Récord de esta sesión: (\d+)$/, (m) => `Session best: ${m[1]}`],
+  [/^Récord local: (\d+)$/, (m) => `Local best: ${m[1]}`],
   [
     /^Pinturas nuevas: (.+)$/,
     (m) =>
