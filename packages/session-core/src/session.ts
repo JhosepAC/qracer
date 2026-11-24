@@ -405,7 +405,8 @@ export class RoomSession {
     if (!fromHost && peer.id !== controller.id) return [];
     if (
       (fromHost && (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE")) ||
-      (!fromHost && (frame.type === "DRIVE_STATE" || frame.type === "FEEDBACK"))
+      (!fromHost &&
+        (frame.type === "DRIVE_STATE" || frame.type === "FEEDBACK" || frame.type === "PAUSE_ACK"))
     )
       return [];
     if (frame.type === "INPUT" || frame.type === "DRIVE_PAUSE") {

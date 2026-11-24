@@ -1,3 +1,5 @@
+import { featureFlags } from "../features.ts";
+import { ReliablePause } from "./reliable-pause.ts";
 import { DirectTransport } from "./direct.ts";
 import {
   isTransport,
@@ -186,6 +188,7 @@ export class SessionLink {
   private socket?: WebSocket;
   private direct?: DirectTransport;
   private epoch = -1;
+  private pauseAction = new ReliablePause();
   private route: Route = "wss";
   private tried = false;
   private blockedAt?: number;
@@ -222,6 +225,7 @@ export class SessionLink {
   }
 
   private transportState(frame: Extract<ServerFrame, { type: "STATE" }>) {
+    if (this.epoch !== frame.epoch) this.pauseAction.reset();
     this.epoch = frame.epoch;
     if (frame.phase !== "connected") {
       this.direct?.dispose();
@@ -236,7 +240,7 @@ export class SessionLink {
     this.metrics.route = this.route;
     this.direct?.configure(this.epoch);
     if (this.route === "rtc" && !this.direct?.ready) return this.failDirect();
-    if (!this.tried && "RTCPeerConnection" in window) {
+    if (featureFlags.webRtc.enabled && !this.tried && "RTCPeerConnection" in window) {
       this.tried = true;
       this.direct = new DirectTransport(this.role === "host", {
         signal: (kind, payload) =>
@@ -307,6 +311,14 @@ export class SessionLink {
     this.heartbeat = window.setInterval(() => {
       if (!this.ready) return;
       const now = performance.now();
+      this.pauseAction.tick(
+        now,
+        (packet) => this.sendRelay(packet),
+        () => {
+          this.hooks.reconnecting();
+          socket.close();
+        },
+      );
       if (
         now - this.lastHeartbeat > 7000 ||
         (this.blockedAt !== undefined && now - this.blockedAt >= 250)
@@ -350,6 +362,12 @@ export class SessionLink {
       if (frame.type === "STATE") this.transportState(frame);
       if (this.control(frame)) return;
       if ("epoch" in frame && frame.type !== "STATE" && this.route === "rtc") return;
+      if (frame.type === "PAUSE_ACK") {
+        this.pauseAction.ack(frame.epoch, frame.seq);
+        return;
+      }
+      if (frame.type === "DRIVE_PAUSE" && this.role === "host")
+        this.sendRelay({ type: "PAUSE_ACK", epoch: frame.epoch, seq: frame.seq });
       this.hooks.frame(frame);
     };
     socket.onclose = () => {
@@ -391,7 +409,10 @@ export class SessionLink {
         return sent;
       }
       const sent = this.sendRelay(frame);
-      if (sent) this.metrics.wssDrive++;
+      if (sent) {
+        this.metrics.wssDrive++;
+        if (frame.type === "DRIVE_PAUSE") this.pauseAction.sent(frame, performance.now());
+      }
       return sent;
     }
     return this.sendRelay(frame);
@@ -422,6 +443,7 @@ export class SessionLink {
     if (this.closed) return;
     if (endRoom && this.role === "host") this.send({ type: "END" });
     this.closed = true;
+    this.pauseAction.reset();
     this.direct?.dispose();
     clearInterval(this.heartbeat);
     window.clearTimeout(this.retryTimer);
