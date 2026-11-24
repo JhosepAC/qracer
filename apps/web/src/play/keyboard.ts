@@ -24,23 +24,26 @@ export function readBindings(value: unknown): Bindings {
 export const keyName = (code: string) =>
   ({ ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Space: "␣" })[code] ??
   code.replace(/^Key/, "");
-export function keyboardInput(keys: ReadonlySet<string>, bindings: Bindings, assisted: boolean) {
-  const defaults = Object.keys(defaultBindings).every(
-    (key) => bindings[key as Binding] === defaultBindings[key as Binding],
+const actions = Object.keys(defaultBindings) as Binding[];
+const aliases: Record<Binding, string[]> = {
+  left: ["ArrowLeft"],
+  right: ["ArrowRight"],
+  throttle: ["ArrowUp"],
+  brake: ["ArrowDown"],
+  boost: ["ShiftLeft", "ShiftRight"],
+};
+function bound(key: Binding, code: string, bindings: Bindings) {
+  if (bindings[key] === code) return true;
+  return (
+    bindings[key] === defaultBindings[key] &&
+    aliases[key].includes(code) &&
+    !actions.some((other) => bindings[other] === code)
   );
+}
+export function keyboardInput(keys: ReadonlySet<string>, bindings: Bindings, assisted: boolean) {
   const held = (key: Binding) =>
     keys.has(bindings[key]) ||
-    (defaults &&
-      keys.has(
-        {
-          left: "ArrowLeft",
-          right: "ArrowRight",
-          throttle: "ArrowUp",
-          brake: "ArrowDown",
-          boost: "ShiftLeft",
-        }[key],
-      )) ||
-    (key === "boost" && defaults && keys.has("ShiftRight"));
+    aliases[key].some((code) => keys.has(code) && bound(key, code, bindings));
   const brake = Number(held("brake"));
   return {
     ...neutralInput,
@@ -52,13 +55,7 @@ export function keyboardInput(keys: ReadonlySet<string>, bindings: Bindings, ass
   };
 }
 export function isDrivingKey(code: string, bindings: Bindings) {
-  return (
-    (codes.test(code) && Object.values(bindings).includes(code)) ||
-    (Object.keys(defaultBindings).every(
-      (key) => bindings[key as Binding] === defaultBindings[key as Binding],
-    ) &&
-      /^(Arrow(?:Left|Right|Up|Down)|ShiftLeft|ShiftRight)$/.test(code))
-  );
+  return actions.some((key) => bound(key, code, bindings));
 }
 
 export function mountKeyboard(target: HTMLElement, bindings: Bindings, save: () => void) {

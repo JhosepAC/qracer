@@ -13,7 +13,7 @@ test("honors reduced motion and supports conflict-free remapping and assisted ke
   await expect(page.locator("#preview")).toHaveAttribute("data-stable-camera", "true");
   await expect(page.locator("#preview")).toHaveAttribute("data-reduced-flashes", "true");
   await page.getByRole("button", { name: "Sonido y comodidad" }).click();
-  await page.getByLabel("Reducir movimiento", { exact: true }).isChecked();
+  await expect(page.getByLabel("Reducir movimiento", { exact: true })).toBeChecked();
   await page.getByLabel("Conducción asistida con teclado").check();
   await page.getByText("Teclado", { exact: true }).click();
   const left = page.getByLabel("Girar a la izquierda", { exact: true });

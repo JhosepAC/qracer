@@ -28,3 +28,10 @@ it("validates remaps, preserves aliases and keeps brake and assistance authorita
   );
   expect(keyboardInput(new Set(["Space"]), defaultBindings, false).boost).toBe(true);
 });
+
+it("preserves unaffected aliases and gives explicit remaps priority over default aliases", () => {
+  expect(isDrivingKey("ArrowUp", { ...defaultBindings, boost: "KeyN" })).toBe(true);
+  expect(
+    keyboardInput(new Set(["ArrowRight"]), { ...defaultBindings, left: "ArrowRight" }, false).steer,
+  ).toBe(-1);
+});
