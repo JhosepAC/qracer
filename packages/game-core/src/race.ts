@@ -1,3 +1,4 @@
+import { createRun, type Run, type RaceOptions } from "./modes.ts";
 import { CAR_HALF_LENGTH, contactFor, sweptClearance } from "./collision.ts";
 import {
   type DriveInput,
@@ -22,6 +23,7 @@ export interface RaceEvent {
 type Encounter = "near" | "graze" | "contact" | "passed";
 
 export interface Race {
+  readonly run: Run;
   readonly phase: "countdown" | "racing" | "finished";
   readonly countdown: number;
   readonly tick: number;
@@ -43,9 +45,16 @@ export interface Race {
 
 const noEvents: readonly RaceEvent[] = [];
 
-export function createRace(seed: number = 310, config: DrivingConfig = driving): Race {
+export function createRace(
+  seed: number = 310,
+  config: DrivingConfig = driving,
+  options: RaceOptions = {},
+): Race {
+  const run = createRun(seed, config, options);
+  seed = run.seed;
   const driver = initialDriver(config);
   return {
+    run,
     phase: "countdown",
     countdown: COUNTDOWN,
     tick: 0,
@@ -103,7 +112,7 @@ export function stepRace(state: Race, input: DriveInput): Race {
       if (contact === "impact" && seen !== "contact") {
         remember(car.id, "contact");
         if (integrity > 0 && tick >= protectedUntil) {
-          integrity--;
+          if (state.run.mode !== "practice") integrity--;
           protectedUntil = tick + PROTECTION;
           speed = Math.max(config.minimum, speed * 0.62);
           combo = 1;
@@ -149,7 +158,7 @@ export function stepRace(state: Race, input: DriveInput): Race {
 
   return {
     ...state,
-    phase: integrity === 0 ? "finished" : state.phase,
+    phase: integrity === 0 || tick >= state.run.limit ? "finished" : state.phase,
     tick,
     driver: { ...motion, speed, integrity },
     traffic,

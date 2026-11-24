@@ -3,3 +3,6 @@ export * from "./driving.ts";
 export * from "./race.ts";
 export * from "./road.ts";
 export * from "./traffic.ts";
+
+export * from "./modes.ts";
+export * from "./progress.ts";
