@@ -141,13 +141,11 @@ test("offers a recovery download for future data and refuses current-format repl
   const path = await (await downloadEvent).path();
   if (!path) throw new Error("Missing recovery");
   expect(JSON.parse(await readFile(path, "utf8")).data).toEqual(future);
-  await dialog
-    .locator("#data-import")
-    .setInputFiles({
-      name: "current.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(exportProgress(freshData())),
-    });
+  await dialog.locator("#data-import").setInputFiles({
+    name: "current.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportProgress(freshData())),
+  });
   await page
     .getByRole("dialog", { name: "Reemplazar progreso", exact: true })
     .getByRole("button", { name: "Confirmar" })
