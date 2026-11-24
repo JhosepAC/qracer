@@ -27,7 +27,7 @@ export const english: Readonly<Record<string, string>> = {
   Pausa: "Pause",
   Integridad: "Integrity",
   "Volante táctil": "Touch steering wheel",
-  VOLANTE: "STEERING",
+  VOLANTE: "WHEEL",
   "Girar a la izquierda": "Steer left",
   "Girar a la derecha": "Steer right",
   Freno: "Brake",

@@ -4,6 +4,9 @@
   align-items: center;
   gap: 0.4rem;
   color: #f3f6f3;
+  background: #10171b;
+  border-radius: 4px;
+  padding-inline: 0.2rem;
   font:
     400 0.9rem Barlow,
     sans-serif;
