@@ -52,3 +52,33 @@
   margin-inline-start: auto;
   font: inherit;
 }
+
+.presentation-dialog fieldset {
+  border: 1px solid #607f8a;
+  border-radius: 4px;
+  padding: 0.7rem;
+  min-width: 0;
+}
+.key-bindings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.key-bindings label {
+  display: grid;
+  font-size: 0.85rem;
+}
+.key-bindings input {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  background: #101c24;
+  color: #f3f6f3;
+  border: 1px solid #789199;
+  border-radius: 3px;
+  text-align: center;
+  font: inherit;
+}
+#binding-reset {
+  min-height: 48px;
+}

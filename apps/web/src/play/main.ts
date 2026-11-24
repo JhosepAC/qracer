@@ -1,10 +1,11 @@
+import { keyboardInput, isDrivingKey } from "./keyboard.ts";
 import { RaceAudio } from "./audio.ts";
 import { mountPresentation } from "./presentation.ts";
 import { runReport } from "./run-report.ts";
 import { mountRunMenu, modeNames } from "./run-menu.ts";
 import { biomeAt, biomeNames } from "./biomes.ts";
 import { transportLabel } from "../session/diagnostic.ts";
-import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
+import { createRace, FixedClock, stepRace, TICK_HZ } from "@qracer/game-core";
 import type { DriveFrame, DriveMode } from "@qracer/session-core/wire";
 import { DriveChannel, RemoteInput } from "../session/drive-channel.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
@@ -99,7 +100,7 @@ pair.onclick = async () => {
 };
 
 const sound = new RaceAudio();
-mountPresentation(sound, () => {
+const presentation = mountPresentation(sound, () => {
   if (!clock.paused || resumeUntil) stop();
 });
 const runMenu = mountRunMenu(root, () => {
@@ -135,22 +136,13 @@ const startMobile = element<HTMLButtonElement>("start-mobile");
 const driveLink = element("drive-link");
 const raceLink = element("race-link");
 const fallback = element<HTMLButtonElement>("keyboard-fallback");
-const controls = /^(Key[ADWS]|Arrow(Left|Right|Up|Down)|Shift(Left|Right))$/;
 let feedback = "";
 let feedbackUntil = 0;
-const pressed = (...codes: string[]) => Number(codes.some((code) => keys.has(code)));
 const clock = new FixedClock(createRace(), (state) => {
   const input =
     source === "mobile"
       ? remote.get(performance.now())
-      : keys.size
-        ? {
-            steer: pressed("KeyD", "ArrowRight") - pressed("KeyA", "ArrowLeft"),
-            throttle: pressed("KeyW", "ArrowUp"),
-            brake: pressed("KeyS", "ArrowDown"),
-            boost: Boolean(pressed("ShiftLeft", "ShiftRight")),
-          }
-        : neutralInput;
+      : keyboardInput(keys, presentation.settings.bindings, presentation.settings.assisted);
   if ("assist" in input && input.assist) assisted = true;
   const next = stepRace(state, input);
   sound.update(next, input);
@@ -408,6 +400,7 @@ async function mount() {
       quality: selected,
       environment: runMenu.biome(),
       paint: runMenu.paint,
+      comfort: () => presentation.settings,
       progress(completed, label) {
         if (loading !== attempt) return;
         progress.value = completed;
@@ -530,7 +523,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Escape") {
     event.preventDefault();
     if (!event.repeat) stop();
-  } else if (source === "keyboard" && controls.test(event.code)) {
+  } else if (source === "keyboard" && isDrivingKey(event.code, presentation.settings.bindings)) {
     event.preventDefault();
     keys.add(event.code);
   }

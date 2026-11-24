@@ -58,6 +58,7 @@ const colors = [0xffcb47, 0x72cce3, 0xe47e72, 0x58af88, 0x987ed0, 0x68757e].map(
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
 export interface RaceViewOptions {
   quality?: Quality;
+  comfort?: () => { stableCamera: boolean; reducedMotion: boolean; reducedFlashes: boolean };
   environment?: Biome;
   paint?: () => number;
   progress?: (completed: number, label: string) => void;
@@ -107,6 +108,7 @@ export async function createRaceView(
     progress,
     environment: initialBiome = "coast",
     paint: playerPaint,
+    comfort,
   }: RaceViewOptions = {},
 ) {
   const profile = qualities[quality];
@@ -405,6 +407,10 @@ export async function createRaceView(
       const origin = Math.floor(distance / SEGMENT_LENGTH);
       const biome = biomeAt(distance, initialBiome);
       container.dataset.biome = biome;
+      container.dataset.stableCamera = String(
+        comfort?.().stableCamera || reducedMotion.matches || comfort?.().reducedMotion || false,
+      );
+      container.dataset.reducedFlashes = String(comfort?.().reducedFlashes || false);
       if (!world.ready(biome) && !waiting) {
         waiting = true;
         container.dispatchEvent(new CustomEvent("environment-wait"));
@@ -506,7 +512,9 @@ export async function createRaceView(
         0.025,
         -c.lateral * 0.024,
         1,
-        reducedMotion.matches ? 0 : -c.lateral * 0.012,
+        reducedMotion.matches || comfort?.().reducedMotion || comfort?.().stableCamera
+          ? 0
+          : -c.lateral * 0.012,
         paintColor.set(playerPaint?.() ?? 0xffcb47),
       );
       addPose(shadows, pose, 0.015);
@@ -533,7 +541,7 @@ export async function createRaceView(
             vehicle.targetD !== undefined &&
             vehicle.moveAt !== undefined &&
             tick < vehicle.moveAt + 120 &&
-            Math.floor(tick / 20) % 2 === 0
+            (comfort?.().reducedFlashes || Math.floor(tick / 20) % 2 === 0)
           ) {
             const side = Math.sign(vehicle.targetD - vehicle.d);
             roadPose(s - 2.05, trafficLateral(vehicle, tick) + side * 0.7, origin, pose);
@@ -546,12 +554,13 @@ export async function createRaceView(
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
-      const reduced = reducedMotion.matches;
+      const reduced = reducedMotion.matches || comfort?.().reducedMotion || false;
+      const stable = reduced || comfort?.().stableCamera || false;
       const pace = p.speed + (c.speed - p.speed) * alpha;
-      const fast = reduced ? 0 : Math.max(0, pace - 18) / 35;
-      roadPose(distance - 7.1 - fast * 0.72, lateral * 0.69, origin, pose);
+      const fast = stable ? 0 : Math.max(0, pace - 18) / 35;
+      roadPose(distance - 7.1 - fast * 0.72, stable ? 0 : lateral * 0.69, origin, pose);
       camera.position.set(pose.x, 3.12 + fast * 0.21, pose.z);
-      roadPose(distance + 22, lateral * 0.2, origin, pose);
+      roadPose(distance + 22, stable ? 0 : lateral * 0.2, origin, pose);
       camera.lookAt(pose.x, 0.41, pose.z);
       const fov = 49 + fast * 3.8;
       if (Math.abs(camera.fov - fov) >= 0.08) {
@@ -560,7 +569,7 @@ export async function createRaceView(
       }
       sky.position.copy(camera.position);
       ocean.update(reduced ? 0 : tick / TICK_HZ, origin * SEGMENT_LENGTH);
-      effects.update(current, tick, origin, reduced);
+      effects.update(current, tick, origin, reduced, comfort?.().reducedFlashes ?? false);
       renderer.info.reset();
       renderer.render(scene, camera);
     }
