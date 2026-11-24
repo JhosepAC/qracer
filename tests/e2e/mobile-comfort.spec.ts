@@ -19,6 +19,9 @@ test("supports one-hand driving, brake priority and safe pauses on a small hands
   let assist = false;
   await phone.addInitScript(() => {
     delete (window as unknown as Record<string, unknown>).RTCPeerConnection;
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      value: async () => "granted",
+    });
   });
   await phone.routeWebSocket("**/session/ws/**", (client) => {
     const server = client.connectToServer();
@@ -69,6 +72,21 @@ test("supports one-hand driving, brake priority and safe pauses on a small hands
     await expect.poll(() => throttle).toBe(0);
     await brake.dispatchEvent("pointercancel", { pointerId: 1, pointerType: "touch" });
     await expect.poll(() => throttle).toBe(0.35);
+    await phone.getByRole("button", { name: "Activar inclinación" }).click();
+    await phone.evaluate(async () => {
+      for (let i = 0; i < 6; i++) {
+        window.dispatchEvent(
+          new DeviceOrientationEvent("deviceorientation", { beta: 0, gamma: 0 }),
+        );
+        await new Promise((done) => setTimeout(done, 20));
+      }
+    });
+    await expect(phone.locator("#tilt-status")).toContainText("Inclinación activa");
+    await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
+    await expect.poll(() => throttle).toBe(0);
+    await phone.getByRole("button", { name: "Usar táctil" }).click();
+    await page.getByRole("button", { name: "Continuar", exact: true }).click();
+    await expect(phone.locator("#drive-state")).toContainText("En carrera", { timeout: 15000 });
     await phone.getByRole("button", { name: "Pausa", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
     await expect.poll(() => throttle).toBe(0);

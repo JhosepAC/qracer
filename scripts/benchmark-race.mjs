@@ -10,6 +10,7 @@ import { createRelay } from "../apps/relay-local/src/server.ts";
 
 const { values } = parseArgs({
   options: {
+    locale: { type: "string", default: "es" },
     environment: { type: "string", default: "coast" },
     profiles: { type: "string", default: "low,balanced,high" },
     runs: { type: "string", default: "3" },
@@ -22,6 +23,7 @@ const profiles = values.profiles.split(",");
 const runs = Number(values.runs);
 const seconds = Number(values.seconds);
 if (
+  !["es", "en"].includes(values.locale) ||
   !["coast", "desert", "city"].includes(values.environment) ||
   !profiles.every((profile) => ["low", "balanced", "high"].includes(profile)) ||
   !Number.isInteger(runs) ||
@@ -38,7 +40,7 @@ const output = resolve(values.output);
 const staticDir = resolve("apps/web/dist");
 await mkdir(output, { recursive: true });
 const report = {
-  experiment: "F08-world-race",
+  experiment: "QRacer-world-race",
   sourceTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim(),
   sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   manifestSha256: createHash("sha256")
@@ -52,6 +54,8 @@ const report = {
     os: release(),
     seed: 310,
     environment: values.environment,
+    locale: values.locale,
+    audio: "enabled by Play gesture; OS output may be muted by automation",
     controls: "ArrowUp + reserved outer lane; Shift for two seconds mid-run",
     viewport: [1920, 1080],
   },
@@ -60,7 +64,8 @@ const report = {
 const relay = createRelay({ staticDir, allowedOrigins: [] });
 let browser;
 
-function instrument({ profile, warmup }) {
+function instrument({ profile, warmup, locale }) {
+  localStorage.setItem("qracer.locale.v1", locale);
   localStorage.setItem("qracer.graphics.quality", profile);
   const native = window.requestAnimationFrame.bind(window);
   const frames = [],
@@ -200,7 +205,7 @@ try {
         if (message.type() === "error") errors.push(message.text());
       });
       try {
-        await page.addInitScript(instrument, { profile, warmup });
+        await page.addInitScript(instrument, { profile, warmup, locale: values.locale });
         const { port } = relay.server.address();
         await page.goto(`http://127.0.0.1:${port}/play/`);
         await page.waitForSelector(`#preview[data-graphics="ready"][data-quality="${profile}"]`);
@@ -211,7 +216,7 @@ try {
           );
         }
         if (run === 1) await page.screenshot({ path: resolve(output, `${profile}-menu.png`) });
-        await page.getByRole("button", { name: "Salir a pista" }).click();
+        await page.locator("#start").click();
         await page.keyboard.down("ArrowUp");
         const lane = openLane(310);
         if (lane !== 1) await page.keyboard.down(lane === 0 ? "ArrowLeft" : "ArrowRight");
