@@ -45,6 +45,7 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     });
   });
   await phone.addInitScript(() => {
+    delete (window as unknown as Record<string, unknown>).RTCPeerConnection;
     Object.defineProperty(window.DeviceOrientationEvent, "requestPermission", {
       value: async () => document.body.dataset.tiltPermission ?? "denied",
     });
