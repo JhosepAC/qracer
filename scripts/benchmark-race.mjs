@@ -1,3 +1,4 @@
+import { seedBenchmarkGhost } from "./ghost-fixture.mjs";
 import { openLane } from "../packages/game-core/src/traffic.ts";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -10,6 +11,7 @@ import { createRelay } from "../apps/relay-local/src/server.ts";
 
 const { values } = parseArgs({
   options: {
+    ghost: { type: "boolean", default: false },
     locale: { type: "string", default: "es" },
     environment: { type: "string", default: "coast" },
     profiles: { type: "string", default: "low,balanced,high" },
@@ -31,7 +33,8 @@ if (
   runs > 10 ||
   !Number.isInteger(seconds) ||
   seconds < 5 ||
-  seconds > 1800
+  seconds > 1800 ||
+  (values.ghost && seconds > 110)
 )
   throw new Error("Invalid benchmark parameters");
 
@@ -43,12 +46,18 @@ const report = {
   experiment: "QRacer-world-race",
   sourceTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim(),
   sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  sourceDirty: Boolean(
+    execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+      encoding: "utf8",
+    }).trim(),
+  ),
   manifestSha256: createHash("sha256")
     .update(await readFile(resolve(staticDir, ".vite/manifest.json")))
     .digest("hex"),
   conditions: {
     seconds,
     warmup,
+    ghost: values.ghost ? "Synthetic offset comparison trajectory, native IndexedDB" : "disabled",
     cpu: cpus()[0]?.model,
     memoryGiB: totalmem() / 2 ** 30,
     os: release(),
@@ -56,7 +65,7 @@ const report = {
     environment: values.environment,
     locale: values.locale,
     audio: "enabled by Play gesture; OS output may be muted by automation",
-    controls: "ArrowUp + reserved outer lane; Shift for two seconds mid-run",
+    controls: "ArrowUp + reserved lane (center for seed 310); Shift for two seconds mid-run",
     viewport: [1920, 1080],
   },
   runs: [],
@@ -74,6 +83,7 @@ function instrument({ profile, warmup, locale }) {
   const maxima = {};
   const biomes = new Set();
   const resources = [];
+  let ghostSamples = 0;
   let resourcesAt = -Infinity;
   let start = Infinity;
   let previous;
@@ -122,6 +132,7 @@ function instrument({ profile, warmup, locale }) {
       work.push(performance.now() - before);
       if (now - sampledAt >= 100) {
         const current = JSON.parse(document.getElementById("preview").dataset.renderStats ?? "{}");
+        if (current.ghostVisible) ghostSamples++;
         for (const [key, value] of Object.entries(current))
           if (typeof value === "number") maxima[key] = Math.max(maxima[key] ?? 0, value);
         const biome = document.getElementById("preview").dataset.biome;
@@ -169,6 +180,7 @@ function instrument({ profile, warmup, locale }) {
         gpuDisjoint: disrupted,
         longTasks: { count: taskCount, maximumMs: longest },
         renderer: maxima,
+        ghostSamples,
         biomes: [...biomes],
         resources,
         transferBytes,
@@ -207,7 +219,9 @@ try {
       try {
         await page.addInitScript(instrument, { profile, warmup, locale: values.locale });
         const { port } = relay.server.address();
-        await page.goto(`http://127.0.0.1:${port}/play/`);
+        const origin = `http://127.0.0.1:${port}`;
+        if (values.ghost) await seedBenchmarkGhost(page, origin, seconds);
+        await page.goto(`${origin}/play/`);
         await page.waitForSelector(`#preview[data-graphics="ready"][data-quality="${profile}"]`);
         if (values.environment !== "coast") {
           await page.locator("#run-biome").selectOption(values.environment);
@@ -215,6 +229,7 @@ try {
             `#preview[data-graphics="ready"][data-biome="${values.environment}"]`,
           );
         }
+        if (values.ghost) await page.locator("#run-mode").selectOption("time-trial");
         if (run === 1) await page.screenshot({ path: resolve(output, `${profile}-menu.png`) });
         await page.locator("#start").click();
         await page.keyboard.down("ArrowUp");
@@ -231,7 +246,7 @@ try {
         console.log(profile, run, result.frames, result.renderer, result.distance, errors);
         if (run === 1) await page.screenshot({ path: resolve(output, `${profile}-race.png`) });
         await save();
-        if (result.mode !== "playing" || errors.length)
+        if (result.mode !== "playing" || errors.length || (values.ghost && !result.ghostSamples))
           throw new Error(`Invalid run: ${profile}/${run}`);
       } finally {
         await page.close();

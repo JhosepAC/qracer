@@ -29,7 +29,31 @@ try {
     }
   }
   if ((await fetch(`${origin}/.env`)).status !== 404) throw new Error("Hidden file route exposed");
-  console.log("Archive checksum and isolated server/desktop/controller smoke passed.");
+  const manifest = JSON.parse(
+    await readFile(join(root, "apps/web/dist/.vite/offline.json"), "utf8"),
+  );
+  const worker = await fetch(`${origin}/sw.js`);
+  if (
+    !worker.ok ||
+    !worker.headers.get("content-type")?.includes("javascript") ||
+    !(await worker.text()).includes(manifest.id)
+  )
+    throw new Error("Packaged offline worker is missing or mismatched");
+  await Promise.all(
+    manifest.entries.map(async (entry) => {
+      const response = await fetch(`${origin}${entry.url}`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (
+        !response.ok ||
+        bytes.length !== entry.size ||
+        createHash("sha256").update(bytes).digest("hex") !== entry.hash
+      )
+        throw new Error(`Packaged offline resource mismatch: ${entry.url}`);
+    }),
+  );
+  console.log(
+    "Archive checksum, offline manifest assets and isolated server/desktop/controller smoke passed.",
+  );
 } finally {
   await relay.close();
 }

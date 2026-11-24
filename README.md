@@ -11,7 +11,9 @@ Instrucciones del laboratorio en [PROBES.md](PROBES.md).
 El menú costero ofrece tres perfiles gráficos. Para medir la carrera en tu
 equipo después de compilar, ejecuta `node scripts/benchmark-race.mjs`. El
 informe separa los intervalos de imagen, el tiempo del callback y las muestras
-GPU que proporcione el navegador.
+GPU que proporcione el navegador. Para medir el coste del fantasma con una
+trayectoria sintética local: `node scripts/benchmark-race.mjs --ghost --profiles balanced --runs 1 --seconds 90`.
+Esta opción usa contrarreloj y admite hasta 110 segundos por ejecución.
 
 - [Instrucciones para agentes](AGENTS.md)
 
@@ -46,7 +48,7 @@ pnpm dev:local
 
 Abrir `http://127.0.0.1:3000/play/` para jugar y `/probe/` para F02. El relay sirve las aplicaciones,
 `/health`, el bootstrap `/ws` y las sesiones aisladas `/probe/session`/`/probe/ws/…`.
-La vinculación definitiva y la política de reconexión pertenecen a F04.
+Las rutas `/session` y `/session/ws/…` gestionan la vinculación y reconexión del juego.
 
 Para cambiar host, puerto y orígenes, copiar `apps/relay-local/.env.example` a `.env` dentro de esa aplicación. LAN requiere configurar host/orígenes explícitamente y permitir solo el puerto necesario; no desactivar firewall ni abrir puertos del router. Los sensores requieren HTTPS de confianza.
 
@@ -106,8 +108,8 @@ es recreativo y no usa una clasificación global.
 Práctica mantiene la integridad y permite **Terminar práctica**. No concede
 récords ni pinturas. Los otros modos permiten completar objetivos y desbloquear
 seis pinturas con idénticas prestaciones. Progreso, medallas y récords actuales
-se conservan mientras la pestaña siga abierta. La persistencia duradera y el
-fantasma corresponden a una fase posterior.
+se guardan en este navegador cuando el almacenamiento está disponible.
+Contrarreloj y diario pueden mostrar el fantasma de tu mejor recorrido compatible.
 
 Las categorías de récord separan modo, semilla, versiones, configuración y
 ayudas. Los entornos cambian durante el recorrido y se descargan por adelantado.
@@ -135,7 +137,35 @@ según las capacidades del dispositivo.
 
 El selector **Idioma / Language** cambia entre español e inglés sin recargar ni
 perder la vinculación. Preferencias de presentación y mando se guardan localmente
-cuando el navegador lo permite; los resultados de carrera aún duran solo esta sesión.
+cuando el navegador lo permite; los resultados y récords se guardan en la PC.
+
+## Progreso, tarjetas y juego sin conexión
+
+**Datos locales** permite revisar récords y últimas partidas, exportar/importar
+progreso JSON (máximo 1 MiB), borrar progreso/fantasmas y restablecer ajustes.
+Reemplazos y borrados piden confirmación. PC y mando conservan sus ajustes por
+separado. El modo privado, la limpieza o la evicción del navegador pueden borrar
+los datos: exporta una copia para conservarlos. No hay cuentas ni sincronización cloud.
+
+El fantasma es una trayectoria visual a 20 Hz sin colisiones, separada por modo,
+semilla, reglas, generador, configuración y ayudas. Se guardan hasta diez mejores
+recorridos compatibles; puede ocultarse en el menú. El JSON de progreso no incluye
+los binarios de fantasma. En resultados, **Descargar tarjeta PNG** crea una imagen
+local; **Compartir tarjeta** aparece cuando el navegador permite compartir archivos.
+
+En una compilación servida con HTTPS de confianza o en `localhost`/`127.0.0.1`,
+**Jugar sin conexión** indica cuándo la costa está descargada para jugar con teclado.
+**Descargar todos los entornos** prepara desierto y ciudad. Espera la confirmación
+antes de desconectar la red; el contenido faltante se indica y puede reintentarse.
+El servidor Vite de desarrollo no genera esta caché: usa `pnpm build` y el relay
+local, el paquete compilado o un alojamiento HTTPS. La ruta HTTP por IP LAN permite
+jugar con red y táctil, pero no habilita caché offline ni sensores seguros.
+
+**Aplicar actualización** aparece en el menú cuando hay una versión preparada.
+Todas las pestañas de PC deben volver al menú o cerrarse; una carrera pausada
+sigue bloqueando la actualización. **Borrar descargas** conserva progreso y ajustes
+y desactiva la caché hasta prepararla de nuevo. Las sesiones, credenciales y WSS
+no se cachean. Vincular un teléfono sin Internet requiere relay local y LAN disponibles.
 
 ## Transporte directo y recuperación
 
