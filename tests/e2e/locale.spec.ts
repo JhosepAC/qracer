@@ -19,7 +19,10 @@ test("switches language during a run without reloading or changing its category"
   await page.getByRole("button", { name: "Close settings" }).click();
   await page.getByRole("button", { name: "Hit the road" }).click();
   const category = await page.locator("#app").getAttribute("data-run-category");
-  await page.getByLabel("Language", { exact: true }).selectOption("es");
+  const language = page.getByLabel("Language", { exact: true });
+  await language.focus();
+  await language.press("ArrowUp");
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
   expect(await page.locator("#app").getAttribute("data-run-category")).toBe(category);
   await expect(page.locator("#integrity")).toHaveText("Integridad 3/3");
   await page.keyboard.press("Escape");
