@@ -3,8 +3,18 @@ import { expect, test } from "@playwright/test";
 test("honors reduced motion and supports conflict-free remapping and assisted keyboard play", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 480, height: 320 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
+    // Verify the actual WebGL camera while insulating input assertions from CI's
+    // software-GPU frame stalls, which correctly trigger the production watchdog.
+    const request = window.requestAnimationFrame.bind(window);
+    let time = 0;
+    window.requestAnimationFrame = (callback) =>
+      request(() => {
+        time += 1000 / 12;
+        callback(time);
+      });
     localStorage.setItem("qracer.graphics.quality", "low");
     localStorage.setItem("qracer.presentation.v1", JSON.stringify({ muted: true }));
   });
