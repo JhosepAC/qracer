@@ -1,4 +1,4 @@
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 export const TICK_HZ = 60;
 export const STEP_SECONDS = 1 / TICK_HZ;
 export const ROAD_HALF_WIDTH = 6;
