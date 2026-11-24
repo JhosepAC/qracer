@@ -27,6 +27,7 @@ export interface Peer {
   driveControl?: number;
   drive?: DriveRate;
   signalBytes?: number;
+  transportControl?: number;
 }
 
 interface Pending {
@@ -300,6 +301,7 @@ export class RoomSession {
       peer.count = 0;
       peer.total = 0;
       peer.driveControl = 0;
+      peer.transportControl = 0;
     }
     peer.total = (peer.total ?? 0) + 1;
     const message = peer.total <= 50 ? parseClient(raw) : undefined;
@@ -351,7 +353,8 @@ export class RoomSession {
       !this.peers.has(peer.id)
     )
       return [];
-    if (++peer.count > 40) return [];
+    peer.transportControl = (peer.transportControl ?? 0) + 1;
+    if (peer.transportControl > 40) return [];
     const fromHost = peer.id === host;
     if (frame.type === "HEARTBEAT") return [{ id: peer.id, frame }];
     if (frame.type === "SIGNAL") {
