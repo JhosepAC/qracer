@@ -1,26 +1,27 @@
-import { mountOffline } from "../offline/menu.ts";
-import { evictOptional, localRelay, updateBlocked } from "../offline/client.ts";
-import { progressStore } from "../storage/database.ts";
-import { mountResultCard, snapshot } from "./result-card.ts";
-import { mountDataMenu } from "./data-menu.ts";
-import { mountLocale } from "../i18n/locale.ts";
-import { keyboardInput, isDrivingKey } from "./keyboard.ts";
-import { RaceAudio } from "./audio.ts";
-import { mountPresentation } from "./presentation.ts";
-import { runReport } from "./run-report.ts";
-import { mountRunMenu, modeNames } from "./run-menu.ts";
-import { biomeAt, biomeNames } from "./biomes.ts";
-import { transportLabel } from "../session/diagnostic.ts";
 import { createRace, FixedClock, stepRace, TICK_HZ } from "@qracer/game-core";
-import type { DriveFrame, DriveMode } from "@qracer/session-core/wire";
-import { DriveChannel, RemoteInput } from "../session/drive-channel.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
+import { type DriveFrame, type DriveMode, NEUTRAL_MS } from "@qracer/session-core/wire";
 import { featureFlags } from "../features.ts";
+import { mountLocale } from "../i18n/locale.ts";
+import { evictOptional, localRelay, updateBlocked } from "../offline/client.ts";
+import { mountOffline } from "../offline/menu.ts";
+import { transportLabel } from "../session/diagnostic.ts";
+import { DriveChannel, RemoteInput } from "../session/drive-channel.ts";
+import { InputPipeline } from "../session/timing.ts";
+import { progressStore } from "../storage/database.ts";
+import { RaceAudio } from "./audio.ts";
+import { biomeAt, biomeNames } from "./biomes.ts";
+import { mountDataMenu } from "./data-menu.ts";
+import { isDrivingKey, keyboardInput } from "./keyboard.ts";
+import { mountPresentation } from "./presentation.ts";
+import { mountResultCard, snapshot } from "./result-card.ts";
+import { modeNames, mountRunMenu } from "./run-menu.ts";
+import { runReport } from "./run-report.ts";
 import "../styles.css";
 import "../session/pair.css";
 import "./race.css";
-import type { createRaceView } from "./race-view.ts";
 import { isQuality, loadQuality, saveQuality } from "./quality.ts";
+import type { createRaceView } from "./race-view.ts";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing application root");
@@ -127,9 +128,19 @@ const runMenu = mountRunMenu(root, () => {
   clock.reset(runMenu.create());
   void mount();
 });
-mountDataMenu(() => {
-  if (!clock.paused || resumeUntil) stop();
-});
+mountDataMenu(
+  () => {
+    if (!clock.paused || resumeUntil) stop();
+  },
+  () => ({
+    app: "QRacer-performance",
+    schemaVersion: 1,
+    pipeline: pipeline.summary(),
+    rttMs: channel.rtt.summary(),
+    rttScope: "since last start/epoch; may include different transports",
+    graphics: { quality: quality.value, ...(lastRendering ?? view?.stats()) },
+  }),
+);
 const preview = element("preview");
 const start = element<HTMLButtonElement>("start");
 const pause = element<HTMLButtonElement>("pause");
@@ -158,6 +169,8 @@ const nitro = element<HTMLMeterElement>("nitro");
 const keys = new Set<string>();
 const remote = new RemoteInput();
 const channel = new DriveChannel();
+const pipeline = new InputPipeline();
+let lastRendering: ReturnType<Awaited<ReturnType<typeof createRaceView>>["stats"]> | undefined;
 let sendDrive: ((frame: DriveFrame) => boolean) | undefined;
 let source: "keyboard" | "mobile" = "keyboard";
 let resumeUntil = 0;
@@ -175,6 +188,8 @@ const clock = new FixedClock(createRace(), (state) => {
     source === "mobile"
       ? remote.get(performance.now())
       : keyboardInput(keys, presentation.settings.bindings, presentation.settings.assisted);
+  if (source === "mobile" && state.phase === "racing" && remote.age(performance.now()) < NEUTRAL_MS)
+    pipeline.apply(remote.seq, performance.now());
   if ("assist" in input && input.assist) assisted = true;
   const next = stepRace(state, input);
   sound.update(next, input);
@@ -221,7 +236,8 @@ function updateHud() {
   element("run-hud").textContent =
     `${modeNames[state.run.mode]} · ${biomeNames[biomeAt(state.driver.s, runMenu.biome())]}${Number.isFinite(remaining) ? ` · ${remaining} s` : ""} · Combo ×${state.combo}`;
   element("finish-practice").hidden = state.run.mode !== "practice";
-  if (view && !contextLost) preview.dataset.renderStats = JSON.stringify(view.stats());
+  if (view && !contextLost)
+    preview.dataset.renderStats = JSON.stringify({ ...view.stats(), simulationTick: state.tick });
   speed.textContent = String(Math.round(state.driver.speed * 3.6));
   distance.textContent = `${Math.floor(state.driver.s)} m`;
   score.textContent = String(state.score);
@@ -245,6 +261,7 @@ function stop(finished = false, reason = "") {
   if (!contextLost && !document.hidden) view?.draw(clock.current, clock.current, 0);
   const image = finished ? snapshot(view?.canvas) : undefined;
   updateHud();
+  lastRendering = view?.stats();
   if (!finished) card.clear();
   root?.setAttribute("data-mode", finished ? "results" : "paused");
   element("overlay").hidden = false;
@@ -290,6 +307,8 @@ function frame(now: number) {
   if (clock.current.phase === "finished") return stop(true);
   if (clock.paused) return stop();
   view.draw(clock.previous, clock.current, alpha, now);
+  if (source === "mobile" && clock.current.phase === "racing")
+    pipeline.submit(remote.seq, performance.now());
   if (now - lastHud >= 100) {
     lastHud = now;
     updateHud();
@@ -309,6 +328,9 @@ function run(reset: boolean) {
     return;
   card.clear();
   if (reset) {
+    pipeline.reset();
+    channel.rtt.reset();
+    lastRendering = undefined;
     clock.reset(runMenu.create());
     if (root) {
       root.dataset.runCategory = clock.current.run.category;
@@ -345,6 +367,7 @@ function mobileConnection(epoch?: number, send?: (frame: DriveFrame) => boolean)
   const changed = channel.epoch !== epoch;
   channel.configure(epoch, send);
   remote.configure(epoch);
+  if (changed) pipeline.reset();
   sendDrive = send;
   if (changed && source === "mobile" && (!clock.paused || resumeUntil))
     stop(false, "Se perdió la conexión con el mando. Espera a que vuelva o usa el teclado.");
@@ -354,9 +377,17 @@ function mobileConnection(epoch?: number, send?: (frame: DriveFrame) => boolean)
 function mobileFrame(packet: DriveFrame) {
   const now = performance.now();
   if (!channel.receive(packet, now)) return;
-  if (packet.type === "INPUT")
+  if (packet.type === "INPUT") {
+    const before = remote.seq;
     remote.accept(packet, channel.sync.receiveTime(packet.captured, now), now);
-  else if (packet.type === "DRIVE_PAUSE" && packet.seq > remote.seq) {
+    if (
+      remote.seq !== before &&
+      source === "mobile" &&
+      !clock.paused &&
+      clock.current.phase === "racing"
+    )
+      pipeline.receive(remote.seq, now);
+  } else if (packet.type === "DRIVE_PAUSE" && packet.seq > remote.seq) {
     remote.seq = packet.seq;
     remote.clear();
     if (source === "mobile" && (!clock.paused || resumeUntil))

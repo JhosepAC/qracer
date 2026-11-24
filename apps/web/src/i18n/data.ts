@@ -1,4 +1,7 @@
 export const dataEnglish: Readonly<Record<string, string>> = {
+  "Guardar diagnóstico de rendimiento": "Save performance diagnostic",
+  "Diagnóstico descargado sin entradas ni credenciales.":
+    "Diagnostic downloaded without inputs or credentials.",
   "Ajustar resolución para mantener fluidez": "Adjust resolution to keep motion smooth",
   "Actualización en curso. La carrera estará disponible enseguida.":
     "Update in progress. Racing will be available shortly.",
