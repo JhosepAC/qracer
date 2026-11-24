@@ -8,16 +8,16 @@
     "pipeline": "Blender 5.3 MCP / glTF Transform 4.5.1 / Meshopt"
   },
   "desert.glb": {
-    "bytes": 56180,
-    "sha256": "e0ffa9eb687b7136df115d9ba55434a1dcab062cef7320577336333f9b735dc9",
+    "bytes": 55812,
+    "sha256": "6400988b4688cccf60b6d76a310e5838cac79108d90ffb5e6098f3265f74d443",
     "source": "assets-src/world/world.blend",
     "license": "MIT",
     "author": "QRacer contributors",
     "pipeline": "Blender 5.3 MCP / glTF Transform 4.5.1 / Meshopt"
   },
   "city.glb": {
-    "bytes": 157372,
-    "sha256": "71d648079f6e2442738c35e2eff0b434e085e5760cdcc03c872f6aeaef8b14d3",
+    "bytes": 332400,
+    "sha256": "9bb2fd19c2090b2cf5fd7969f4ca9d9dff42e1e033b69588f58a83354237eded",
     "source": "assets-src/world/world.blend",
     "license": "MIT",
     "author": "QRacer contributors",
