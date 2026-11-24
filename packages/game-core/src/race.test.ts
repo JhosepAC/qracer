@@ -80,13 +80,14 @@ it("keeps work zones stationary, passable and absent from overtaking rewards", (
   const moving = { s: 320, tick: 0, cars: [] };
   const previous = { nextRow: 3, rows: [moving] };
   const generated = advanceTraffic(previous, race.seed, 224, 1000).rows[1];
-  expect(generated).toMatchObject({ hazard: "cones", s: 480 });
+  expect(generated).toMatchObject({ hazard: "cones", s: 584 });
   if (!generated) throw new Error("Missing work zone");
   expect(generated.cars).toHaveLength(1);
   expect(generated.cars[0]?.d).not.toBe(laneCenters[openLane(race.seed)]);
-  expect(trafficPosition(generated, 2000)).toBe(480);
+  expect(trafficPosition(generated, 2000)).toBe(584);
   expect(
-    advanceTraffic({ nextRow: 100, rows: [moving, hazard] }, race.seed, 510, 2000).rows,
+    advanceTraffic({ nextRow: 100, nextSpawn: 1e9, rows: [moving, hazard] }, race.seed, 510, 2000)
+      .rows,
   ).toEqual(previous.rows);
 
   let safe: Race = { ...race, traffic: { nextRow: 100, rows: [{ ...hazard, s: 8, tick: 0 }] } };
