@@ -1,3 +1,4 @@
+import { runReport } from "./run-report.ts";
 import { mountRunMenu, modeNames } from "./run-menu.ts";
 import { biomeAt, biomeNames } from "./biomes.ts";
 import { transportLabel } from "../session/diagnostic.ts";
@@ -71,6 +72,7 @@ root.innerHTML = `
     <button class="button" type="button" id="keyboard-fallback" hidden>Usar teclado</button>
     <button class="button" type="button" id="return-menu">Elegir otro recorrido</button>
     <p id="run-result" class="fine-print" hidden></p>
+    <button type="button" class="button" id="download-run" hidden>Guardar resumen de carrera</button>
   </section>`;
 
 function element<T extends HTMLElement>(id: string): T {
@@ -221,6 +223,7 @@ function stop(finished = false, reason = "") {
     ? `${result.score} puntos${assisted ? " · asistida" : ""}`
     : reason || "Pulsa Continuar para volver a la pista.";
   element("run-result").hidden = !finished;
+  element("download-run").hidden = !finished;
   if (finished) {
     element("run-result").textContent = runMenu.finish(result, assisted);
     element("result-distance").textContent = `${Math.floor(result.driver.s)} m`;
@@ -464,6 +467,17 @@ preview.addEventListener("environment-error", () => {
     "No se pudo descargar el entorno. Vuelve al menú para reintentar.";
   resume.disabled = true;
 });
+element("download-run").onclick = () => {
+  if (clock.current.phase !== "finished") return;
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(runReport(clock.current), null, 2)], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "qracer-carrera.json";
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 element("finish-practice").onclick = () => {
   if (clock.current.run.mode !== "practice") return;
   clock.reset({ ...clock.current, phase: "finished" });

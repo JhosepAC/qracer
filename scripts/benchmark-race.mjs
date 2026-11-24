@@ -39,6 +39,7 @@ const staticDir = resolve("apps/web/dist");
 await mkdir(output, { recursive: true });
 const report = {
   experiment: "F08-world-race",
+  sourceTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim(),
   sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   manifestSha256: createHash("sha256")
     .update(await readFile(resolve(staticDir, ".vite/manifest.json")))
