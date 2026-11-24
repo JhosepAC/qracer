@@ -1,3 +1,4 @@
+import { mountLocale } from "../i18n/locale.ts";
 import { isTransport } from "@qracer/session-core/wire";
 import { controlsMarkup, mountDrive } from "./drive.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
@@ -156,3 +157,5 @@ window.addEventListener("pageshow", (event) => {
     status.textContent = "Pega una invitación nueva desde la PC.";
   }
 });
+
+mountLocale();
