@@ -14,6 +14,12 @@ it("migrates the supported plain progress without dropping versioned records", (
   const state = addResult(freshData(), result("first"));
   expect(readData(state.progress)).toEqual({ ...state, history: [] });
   expect(() => readData({ ...state, schemaVersion: 3 })).toThrow(new DataFault("future"));
+  expect(() => readData({ ...state, progress: { ...state.progress, schemaVersion: 2 } })).toThrow(
+    new DataFault("future"),
+  );
+  expect(() =>
+    readData({ ...state, history: [{ ...state.history[0], schemaVersion: 2 }] }),
+  ).toThrow(new DataFault("future"));
 });
 it("bounds retention, keeps the principal best and awards each recent run once", () => {
   let state = addResult(freshData(), result("first", 99999));

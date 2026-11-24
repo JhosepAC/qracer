@@ -84,6 +84,8 @@ export function categoryInfo(value: unknown) {
 const idValid = (id: unknown): id is string => typeof id === "string" && /^[\w-]{1,80}$/.test(id);
 export function readProgress(value: unknown): Progress {
   if (!object(value)) throw new DataFault("corrupt");
+  if (typeof value.schemaVersion === "number" && value.schemaVersion > 1)
+    throw new DataFault("future");
   fields(value, ["schemaVersion", "distance", "overtakes", "nearMisses", "recent", "records"]);
   if (
     value.schemaVersion !== 1 ||
@@ -114,6 +116,8 @@ export function readProgress(value: unknown): Progress {
 }
 export function readSummary(value: unknown): Summary {
   if (!object(value)) throw new DataFault("corrupt");
+  if (typeof value.schemaVersion === "number" && value.schemaVersion > 1)
+    throw new DataFault("future");
   fields(value, [
     "schemaVersion",
     "id",
