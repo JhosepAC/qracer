@@ -65,6 +65,7 @@ export function mountLocale() {
         ? title
         : `QRacer — ${location.pathname.startsWith("/controller") ? "Controller" : "Drive"}`;
     visit(document.body);
+    document.dispatchEvent(new Event("qracer:locale"));
     if (locale === "en")
       observer.observe(document.body, {
         subtree: true,
