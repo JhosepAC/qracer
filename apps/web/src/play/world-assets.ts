@@ -1,11 +1,5 @@
-import {
-  Mesh as SceneMesh,
-  type Material,
-  type Mesh,
-  type InstancedMesh,
-  type Object3D,
-  type WebGLRenderer,
-} from "three";
+import { disposeObjects } from "../graphics/resources.ts";
+import type { Material, Mesh, InstancedMesh, Object3D, WebGLRenderer } from "three";
 import { assetRoot } from "../graphics/batching.ts";
 import { raceAssetLoader } from "./race-assets.ts";
 import type { Biome } from "./biomes.ts";
@@ -20,13 +14,7 @@ export async function loadWorldAsset(name: string, renderer: WebGLRenderer, sign
   try {
     const model = await loader.models.parseAsync(buffer, "");
     if (signal.aborted) {
-      model.scene.traverse((node) => {
-        if (node instanceof SceneMesh) {
-          node.geometry.dispose();
-          for (const material of Array.isArray(node.material) ? node.material : [node.material])
-            material.dispose();
-        }
-      });
+      disposeObjects([model.scene]);
       signal.throwIfAborted();
     }
     return model.scene;
@@ -41,6 +29,8 @@ export function worldAssets(
   roots: Object3D[],
   batch: (root: Object3D, count: number, space?: Object3D) => Batch,
   changed: () => void,
+  prepare: (model: Object3D) => Promise<void> = async () => {},
+  loadModel = loadWorldAsset,
 ) {
   const kits = new Map<Biome, Record<string, Batch>>();
   const pending = new Map<Biome, Promise<void>>();
@@ -50,21 +40,45 @@ export function worldAssets(
     const existing = pending.get(key);
     if (existing) return existing;
     const request = (async () => {
-      const model = await loadWorldAsset(key, renderer, signal);
-      roots.push(model);
-      const names =
-        key === "city" ? ["arcology", "portal", "bridge"] : ["mesa", "cactus", "portal", "bridge"];
-      const kit: Record<string, Batch> = {};
-      for (const name of names) {
-        const instances = batch(
-          assetRoot(model, "qracer_asset", name),
-          name === "arcology" ? 24 : 18,
-          model,
-        );
-        kit[name] = instances;
-        batches.push(instances);
+      const model = await loadModel(key, renderer, signal);
+      if (signal.aborted) {
+        disposeObjects([model]);
+        signal.throwIfAborted();
       }
-      kits.set(key, kit);
+      roots.push(model);
+      const created: Batch[] = [];
+      try {
+        const names =
+          key === "city"
+            ? ["arcology", "portal", "bridge"]
+            : ["mesa", "cactus", "portal", "bridge"];
+        const kit: Record<string, Batch> = {};
+        for (const name of names) {
+          const instances = batch(
+            assetRoot(model, "qracer_asset", name),
+            name === "arcology" ? 24 : 18,
+            model,
+          );
+          kit[name] = instances;
+          batches.push(instances);
+          created.push(instances);
+        }
+        await prepare(model);
+        signal.throwIfAborted();
+        kits.set(key, kit);
+      } catch (error) {
+        for (const group of created) {
+          for (const mesh of group) mesh.removeFromParent();
+          const index = batches.indexOf(group);
+          if (index >= 0) batches.splice(index, 1);
+        }
+        const root = roots.indexOf(model);
+        if (root >= 0) {
+          roots.splice(root, 1);
+          disposeObjects([model, ...created.flat()]);
+        }
+        throw error;
+      }
       changed();
     })();
     pending.set(key, request);
@@ -74,5 +88,15 @@ export function worldAssets(
       pending.delete(key);
     }
   }
-  return { kits, batches, load, ready: (key: Biome) => key === "coast" || kits.has(key) };
+  return {
+    clear: () => {
+      kits.clear();
+      pending.clear();
+      batches.length = 0;
+    },
+    kits,
+    batches,
+    load,
+    ready: (key: Biome) => key === "coast" || kits.has(key),
+  };
 }
