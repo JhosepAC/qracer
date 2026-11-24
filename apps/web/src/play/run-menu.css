@@ -1,0 +1,69 @@
+.run-selection {
+  margin-top: 1.8rem;
+  padding: 1rem 1.2rem;
+  max-width: 38rem;
+  background: linear-gradient(115deg, #14242cef, #152029d9);
+  border: 1px solid #66828c;
+  border-top: 2px solid #ffcb47;
+  border-radius: 4px;
+  color: #f3f6f3;
+}
+.run-eyebrow {
+  margin: 0 0 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: #ffcb47;
+}
+.run-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem 1rem;
+}
+.run-fields label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: #c4d1d5;
+}
+.run-fields select,
+.run-fields input {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  background: #101c24;
+  color: #f3f6f3;
+  border: 1px solid #607f8a;
+  border-radius: 3px;
+  padding: 0.4rem;
+  font: inherit;
+}
+.run-selection details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+.run-selection summary {
+  cursor: pointer;
+  padding-block: 0.4rem;
+}
+#run-hud {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #f3f6f3;
+  background: #101c24dd;
+  padding: 0.5rem 0.8rem;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+#finish-practice {
+  position: absolute;
+  top: 5rem;
+  right: 1rem;
+}
+@media (max-width: 700px) {
+  .run-selection {
+    margin-top: 1rem;
+  }
+}
