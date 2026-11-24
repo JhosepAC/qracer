@@ -1,4 +1,17 @@
 export const dataEnglish: Readonly<Record<string, string>> = {
+  "Descargar tarjeta PNG": "Download PNG card",
+  "Compartir tarjeta": "Share card",
+  "Preparando tarjeta…": "Preparing card…",
+  "Carrera asistida": "Assisted run",
+  "Conducción estándar": "Standard driving",
+  "Tu carrera. Tu récord.": "Your race. Your record.",
+  "Tarjeta lista. Se genera en este dispositivo.": "Card ready. Generated on this device.",
+  "Tarjeta compartida.": "Card shared.",
+  "Compartir cancelado. Puedes descargar la tarjeta.":
+    "Sharing cancelled. You can download the card.",
+  "No se pudo compartir. Descarga la tarjeta PNG.": "Could not share. Download the PNG card.",
+  "No se pudo crear la imagen. El resumen de carrera sigue disponible.":
+    "Could not create the image. The run summary is still available.",
   "Mostrar fantasma local": "Show local ghost",
   "Contrarreloj y diario: compara tu mejor recorrido compatible. Sin colisiones ni ventajas.":
     "Time trial and daily: compare your best compatible run. No collisions or advantages.",
