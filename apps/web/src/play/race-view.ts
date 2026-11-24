@@ -12,6 +12,7 @@ import {
   segmentCurvature,
   TICK_HZ,
   trafficPosition,
+  trafficLateral,
 } from "@qracer/game-core";
 import {
   ACESFilmicToneMapping,
@@ -396,7 +397,7 @@ export async function createRaceView(
         const s = trafficPosition(row, Math.max(tick, row.tick));
         if (s - distance > profile.trafficRange || distance - s > 18) continue;
         for (const vehicle of row.cars) {
-          roadPose(s, vehicle.d, origin, pose);
+          roadPose(s, trafficLateral(vehicle, tick), origin, pose);
           if (row.hazard) {
             addPose(hazards[row.hazard], pose, 0.015);
             continue;

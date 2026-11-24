@@ -6,3 +6,4 @@ export * from "./traffic.ts";
 
 export * from "./modes.ts";
 export * from "./progress.ts";
+export * from "./reachability.ts";

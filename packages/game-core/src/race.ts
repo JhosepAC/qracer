@@ -9,7 +9,13 @@ import {
   initialDriver,
   TICK_HZ,
 } from "./driving.ts";
-import { advanceTraffic, emptyTraffic, type Traffic, trafficPosition } from "./traffic.ts";
+import {
+  advanceTraffic,
+  emptyTraffic,
+  type Traffic,
+  trafficPosition,
+  trafficLateral,
+} from "./traffic.ts";
 
 const COUNTDOWN = 3 * TICK_HZ;
 const PROTECTION = 1.5 * TICK_HZ;
@@ -107,7 +113,13 @@ export function stepRace(state: Race, input: DriveInput): Race {
     for (const car of row.cars) {
       const seen = state.encounters.get(car.id);
       if (seen === "passed") continue;
-      const clearance = sweptClearance(oldS, newS, before.d - car.d, motion.d - car.d, extent);
+      const clearance = sweptClearance(
+        oldS,
+        newS,
+        before.d - trafficLateral(car, state.tick),
+        motion.d - trafficLateral(car, tick),
+        extent,
+      );
       const contact = contactFor(clearance, config.playerHalfWidth, row.hazard ? 0.8 : undefined);
       if (contact === "impact" && seen !== "contact") {
         remember(car.id, "contact");
@@ -144,7 +156,13 @@ export function stepRace(state: Race, input: DriveInput): Race {
     }
   }
 
-  const traffic = advanceTraffic(state.traffic, state.seed, motion.s, tick);
+  const traffic = advanceTraffic(
+    state.traffic,
+    state.seed,
+    motion.s,
+    tick,
+    state.run.mode === "practice",
+  );
   let encounters = changes ?? state.encounters;
   if (traffic !== state.traffic && encounters.size > 0) {
     const active = new Map<number, Encounter>();
