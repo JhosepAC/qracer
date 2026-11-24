@@ -443,7 +443,7 @@ export async function createRaceView(
             const kit = world.kits.get(tileBiome);
             if (kit) {
               const model = kit[tileBiome === "city" ? "arcology" : "mesa"];
-              if (model && i % 2 === 0)
+              if (model && i % (tileBiome === "city" && quality === "low" ? 3 : 2) === 0)
                 for (const side of [-1, 1])
                   addPose(
                     model,

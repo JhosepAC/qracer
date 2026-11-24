@@ -26,9 +26,9 @@ def build(repository):
     stone = mat("Terraced sandstone", (0.49, 0.22, 0.10), 0.94)
     strata = mat("Sandstone pale strata", (0.74, 0.44, 0.24), 0.87)
     green = mat("Cactus wax", (0.14, 0.25, 0.18), 0.7)
-    concrete = mat("Architectural concrete", (0.19, 0.23, 0.26), 0.82)
+    concrete = mat("Architectural concrete", (0.045, 0.075, 0.105), 0.76)
     steel = mat("Graphite anodized frames", (0.045, 0.065, 0.085), 0.33, 0.65)
-    windows = mat("Warm occupied windows", (0.42, 0.61, 0.62), 0.32, 0.25, 1.3)
+    windows = mat("Warm occupied windows", (0.22, 0.48, 0.62), 0.24, 0.25, 0.9)
     paint = mat("Traffic Paint", (0.4, 0.45, 0.55), 0.24, 0.48)
     glass = mat("Traffic glass", (0.022, 0.055, 0.073), 0.15, 0.45)
     rubber = mat("Tire compound", (0.02, 0.023, 0.028), 0.93)
@@ -138,12 +138,24 @@ def build(repository):
     tower = group("arcology")
     for index, (z, w, d, h) in enumerate([(2, 18, 16, 4), (12, 12, 12, 16), (24, 9, 10, 8), (30, 7, 7, 4)]):
         slab(tower, "Chamfered setback", (0, 0, z), (w, d, h), concrete, 0.8)
-        for side in [-1, 1]:
-            for level in range(int(z-h/2)+2, int(z+h/2), 2):
-                for column in range(-int(d/2)+2, int(d/2)-1, 2):
-                    slab(tower, "Recessed lit glazing", (side*(w/2+0.025), column, level),
-                         (0.08, 1.1, 0.75), windows, 0.015)
-            slab(tower, "Vertical facade fin", (side*(w/2+0.16), 0, z), (0.25, 0.35, h), steel, 0.04)
+        for axis in [0, 1]:
+            across, along = (w, d) if axis == 0 else (d, w)
+            for side in [-1, 1]:
+                for level in range(int(z-h/2)+1, int(z+h/2), 2):
+                    for column in range(-int(along/2)+2, int(along/2)-1, 2):
+                        center = (side*(across/2+0.022), column, level) if axis == 0 else (column, side*(across/2+0.022), level)
+                        dims = (0.08, 1.25, 0.95) if axis == 0 else (1.25, 0.08, 0.95)
+                        x, y, zz = center
+                        xx, yy, hh = (v/2 for v in dims)
+                        rings = [[(x+a,y+b,zz+c) for a,b in [(-xx,-yy),(xx,-yy),(xx,yy),(-xx,yy)]] for c in [-hh,hh]]
+                        hull(tower, "Facade window bay", rings, glass if (column+level+index)%5 == 0 else windows)
+                for column in [-along/3, 0, along/3]:
+                    center = (side*(across/2+0.12), column, z) if axis == 0 else (column, side*(across/2+0.12), z)
+                    dims = (0.23,0.15,h) if axis == 0 else (0.15,0.23,h)
+                    slab(tower, "Facade mullion", center, dims, steel, 0.025)
+                center = (side*(across/2+0.06),0,z+h/2-0.3) if axis == 0 else (0,side*(across/2+0.06),z+h/2-0.3)
+                dims = (0.16,along-1,0.12) if axis == 0 else (along-1,0.16,0.12)
+                slab(tower,"Architectural crown light",center,dims,windows,0.03)
     for x in [-2, 2]:
         slab(tower, "Rooftop plant", (x, 0, 33), (2.2, 3.5, 2), steel, 0.2)
 
