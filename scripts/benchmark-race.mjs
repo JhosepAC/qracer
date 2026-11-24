@@ -67,6 +67,9 @@ function instrument({ profile, warmup }) {
     work = [],
     gpu = [];
   const maxima = {};
+  const biomes = new Set();
+  const resources = [];
+  let resourcesAt = -Infinity;
   let start = Infinity;
   let previous;
   let sampledAt = -Infinity;
@@ -116,6 +119,17 @@ function instrument({ profile, warmup }) {
         const current = JSON.parse(document.getElementById("preview").dataset.renderStats ?? "{}");
         for (const [key, value] of Object.entries(current))
           if (typeof value === "number") maxima[key] = Math.max(maxima[key] ?? 0, value);
+        const biome = document.getElementById("preview").dataset.biome;
+        if (biome) biomes.add(biome);
+        if (now - resourcesAt >= 1000) {
+          resources.push({
+            seconds: (now - start) / 1000,
+            biome,
+            geometries: current.geometries,
+            textures: current.textures,
+          });
+          resourcesAt = now;
+        }
         sampledAt = now;
       }
     });
@@ -150,6 +164,8 @@ function instrument({ profile, warmup }) {
         gpuDisjoint: disrupted,
         longTasks: { count: taskCount, maximumMs: longest },
         renderer: maxima,
+        biomes: [...biomes],
+        resources,
         transferBytes,
         distance: document.getElementById("distance").textContent,
         mode: document.getElementById("app").dataset.mode,
