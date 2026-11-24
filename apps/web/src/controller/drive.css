@@ -1,3 +1,10 @@
+body:has(.handset) .topbar {
+  padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+  flex-wrap: wrap;
+}
+body:has(.handset) .controller-shell {
+  padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
+}
 .handset[hidden] {
   display: none;
 }
@@ -214,5 +221,32 @@ body:has(.handset:not([hidden])) #controller-title {
   }
   body:has(.handset:not([hidden])) #pair-status {
     margin-block: 0.35rem;
+  }
+}
+
+.handset[data-reduced-flashes="true"] .mobile-feedback {
+  color: #f3f6f3;
+  background: #1b292e;
+  border-inline-start: 3px solid #ffcb47;
+}
+.handset-options-grid label:has(input[type="checkbox"]) {
+  min-height: 48px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.handset-options-grid input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.handset-options-grid {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .handset *,
+  .virtual-wheel span {
+    transition: none;
+    animation: none;
   }
 }

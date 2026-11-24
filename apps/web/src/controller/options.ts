@@ -19,6 +19,9 @@ export const optionsMarkup = `
     <label for="turn-sensitivity">Sensibilidad de giro</label><input id="turn-sensitivity" type="range" min="0.5" max="1.8" step="0.1" value="1">
     <label><input id="turn-invert" type="checkbox"> Invertir volante e inclinación</label>
     <label><input id="drive-assist" type="checkbox"> Conducción asistida</label>
+    <label><input id="drive-onehand" type="checkbox"> Modo de una mano (ayuda)</label>
+    <p>Acelera suavemente solo durante la carrera. El freno tiene prioridad. Cuenta como ayuda.</p>
+    <label><input id="drive-reduced-flashes" type="checkbox"> Reducir flashes</label>
     <label><input id="drive-haptics" type="checkbox"> Vibración</label>
     <label><input id="drive-awake" type="checkbox"> Mantener pantalla activa</label>
     <p id="wake-status"></p>
@@ -33,22 +36,37 @@ export const feedbackPulse = { impact: 55, near: 18, boost: 28 };
 export class FeedbackWindow {
   private lastId = -1;
   private lastAt = -Infinity;
+  private priority = -1;
 
   reset() {
     this.lastId = -1;
     this.lastAt = -Infinity;
+    this.priority = -1;
   }
 
-  accept(id: number, captured: number | undefined, now: number) {
-    if (id <= this.lastId || captured === undefined) return false;
+  accept(id: number, captured: number | undefined, now: number, priority = 0) {
+    if (
+      id <= this.lastId ||
+      captured === undefined ||
+      !Number.isFinite(captured) ||
+      captured > now ||
+      now - captured > 300
+    )
+      return false;
     this.lastId = id;
-    if (now - this.lastAt < 180) return false;
+    if (now - this.lastAt < 180 && priority <= this.priority) return false;
+    this.priority = priority;
     this.lastAt = now;
     return true;
   }
 }
 
-export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTouch: () => void) {
+export function mountOptions(
+  shell: HTMLElement,
+  channel: DriveChannel,
+  clearTouch: () => void,
+  inputLost: () => void,
+) {
   function field<T extends HTMLElement>(id: string): T {
     const node = shell.querySelector<T>(`#${id}`);
     if (!node) throw new Error(`Missing #${id}`);
@@ -58,6 +76,10 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
   const sensitivity = field<HTMLInputElement>("turn-sensitivity");
   const invert = field<HTMLInputElement>("turn-invert");
   const assist = field<HTMLInputElement>("drive-assist");
+  const oneHand = field<HTMLInputElement>("drive-onehand");
+  const reduced = field<HTMLInputElement>("drive-reduced-flashes");
+  reduced.checked = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let calibrated = false;
   const vibration = field<HTMLInputElement>("drive-haptics");
   const awake = field<HTMLInputElement>("drive-awake");
   const wakeStatus = field("wake-status");
@@ -95,6 +117,8 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
       sensitivity.value = String(stored.sensitivity);
     invert.checked = stored?.invert === true;
     assist.checked = stored?.assist === true;
+    oneHand.checked = stored?.oneHand === true;
+    if (typeof stored?.reducedFlashes === "boolean") reduced.checked = stored.reducedFlashes;
     vibration.checked = stored?.vibration === true;
   } catch {
     /* Preferences are optional. */
@@ -102,6 +126,15 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
 
   function save() {
     shell.dataset.side = side.value;
+    shell.dataset.oneHand = String(oneHand.checked);
+    shell.dataset.reducedFlashes = String(reduced.checked);
+    if (!vibration.checked) {
+      try {
+        navigator.vibrate?.(0);
+      } catch {
+        /* Optional API. */
+      }
+    }
     try {
       localStorage.setItem(
         key,
@@ -110,6 +143,8 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
           sensitivity: sensitivity.valueAsNumber,
           invert: invert.checked,
           assist: assist.checked,
+          oneHand: oneHand.checked,
+          reducedFlashes: reduced.checked,
           vibration: vibration.checked,
         }),
       );
@@ -152,7 +187,7 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
     }
   }
 
-  for (const item of [side, sensitivity, invert, assist, vibration])
+  for (const item of [side, sensitivity, invert, assist, vibration, oneHand, reduced])
     item.addEventListener("change", save);
   if (typeof navigator.vibrate !== "function") {
     vibration.disabled = true;
@@ -214,6 +249,11 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
       tilt.center();
       flash.hidden = true;
       if (!linked) {
+        try {
+          navigator.vibrate?.(0);
+        } catch {
+          /* Optional API. */
+        }
         tilt.stop();
         center.hidden = true;
         activate.hidden = false;
@@ -221,7 +261,13 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
       void wake();
     },
     steer(now: number) {
-      return tilt.value(now);
+      const active = tilt.active;
+      const value = tilt.value(now);
+      const ready = tilt.active && tilt.filter.calibrated && tilt.filter.fresh(now);
+      const lost = calibrated && active && !ready;
+      calibrated = ready;
+      if (oneHand.checked && lost) inputLost();
+      return value;
     },
     scale(value: number) {
       return Math.max(
@@ -229,13 +275,23 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
         Math.min(1, value * sensitivity.valueAsNumber * (invert.checked ? -1 : 1)),
       );
     },
-    assist: () => assist.checked,
+    assist: () => assist.checked || oneHand.checked,
+    autoThrottle: () => oneHand.checked && (!tilt.active || calibrated),
     sent() {
       packets++;
     },
     receive(frame: Extract<DriveFrame, { type: "FEEDBACK" }>, now: number) {
       const captured = channel.sync.receiveTime(frame.captured, now, 300);
-      if (document.hidden || !feedback.accept(frame.id, captured, now)) return;
+      if (
+        document.hidden ||
+        !feedback.accept(
+          frame.id,
+          captured,
+          now,
+          frame.kind === "impact" ? 2 : frame.kind === "near" ? 1 : 0,
+        )
+      )
+        return;
       feedbackCount++;
       flash.textContent = feedbackLabels[frame.kind];
       flash.hidden = false;

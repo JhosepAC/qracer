@@ -64,9 +64,11 @@ export function mountDrive(root: HTMLElement) {
   let mode: DriveMode = "ready";
   let focused = true;
 
-  const options = mountOptions(shell, channel, release);
+  const options = mountOptions(shell, channel, release, notifyPause);
   function snapshot(now: number) {
     const input = touch.snapshot(options.steer(now), options.assist());
+    if (options.autoThrottle() && mode === "racing" && input.brake === 0)
+      input.throttle = Math.max(input.throttle, 0.35);
     if (!touch.held("left") && !touch.held("right")) input.steer = options.scale(input.steer);
     return input;
   }
