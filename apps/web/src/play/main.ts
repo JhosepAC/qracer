@@ -1,3 +1,5 @@
+import { mountRunMenu, modeNames } from "./run-menu.ts";
+import { biomeAt, biomeNames } from "./biomes.ts";
 import { transportLabel } from "../session/diagnostic.ts";
 import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
 import type { DriveFrame, DriveMode } from "@qracer/session-core/wire";
@@ -53,6 +55,8 @@ root.innerHTML = `
       <div class="race-speed"><strong id="speed">80</strong> <small>km/h</small></div></div>
     <small id="race-link" class="race-message race-link" hidden></small>
     <p class="race-message" id="message"></p>
+    <output id="run-hud"></output>
+    <button type="button" id="finish-practice" hidden>Terminar práctica</button>
   </section>
   <section class="race-overlay race-controls" id="overlay" aria-labelledby="overlay-title" hidden>
     <h2 id="overlay-title"></h2><p id="summary"></p>
@@ -65,6 +69,8 @@ root.innerHTML = `
     <button class="button primary" type="button" id="resume">Continuar</button>
     <button class="button" type="button" id="restart">Reiniciar</button>
     <button class="button" type="button" id="keyboard-fallback" hidden>Usar teclado</button>
+    <button class="button" type="button" id="return-menu">Elegir otro recorrido</button>
+    <p id="run-result" class="fine-print" hidden></p>
   </section>`;
 
 function element<T extends HTMLElement>(id: string): T {
@@ -88,6 +94,10 @@ pair.onclick = async () => {
   }
 };
 
+const runMenu = mountRunMenu(root, () => {
+  clock.reset(runMenu.create());
+  void mount();
+});
 const preview = element("preview");
 const start = element<HTMLButtonElement>("start");
 const pause = element<HTMLButtonElement>("pause");
@@ -174,6 +184,10 @@ let lastHud = -Infinity;
 
 function updateHud() {
   const state = clock.current;
+  const remaining = Math.max(0, Math.ceil((state.run.limit - state.tick) / TICK_HZ));
+  element("run-hud").textContent =
+    `${modeNames[state.run.mode]} · ${biomeNames[biomeAt(state.driver.s, runMenu.biome())]}${Number.isFinite(remaining) ? ` · ${remaining} s` : ""} · Combo ×${state.combo}`;
+  element("finish-practice").hidden = state.run.mode !== "practice";
   if (view && !contextLost) preview.dataset.renderStats = JSON.stringify(view.stats());
   speed.textContent = String(Math.round(state.driver.speed * 3.6));
   distance.textContent = `${Math.floor(state.driver.s)} m`;
@@ -206,7 +220,9 @@ function stop(finished = false, reason = "") {
   element("summary").textContent = finished
     ? `${result.score} puntos${assisted ? " · asistida" : ""}`
     : reason || "Pulsa Continuar para volver a la pista.";
+  element("run-result").hidden = !finished;
   if (finished) {
+    element("run-result").textContent = runMenu.finish(result, assisted);
     element("result-distance").textContent = `${Math.floor(result.driver.s)} m`;
     element("result-speed").textContent = `${Math.round(result.topSpeed * 3.6)} km/h`;
     element("result-overtakes").textContent = String(result.overtakes);
@@ -247,12 +263,17 @@ function run(reset: boolean) {
   if (
     !view ||
     contextLost ||
+    environmentWaiting ||
     document.hidden ||
     (source === "mobile" && !remote.ready(performance.now()))
   )
     return;
   if (reset) {
-    clock.reset(createRace());
+    clock.reset(runMenu.create());
+    if (root) {
+      root.dataset.runCategory = clock.current.run.category;
+      root.dataset.seed = String(clock.current.seed);
+    }
     feedbackUntil = 0;
     assisted = false;
   } else if (source === "mobile" && clock.current.phase === "countdown") {
@@ -316,7 +337,8 @@ function refreshMobile(now: number) {
   if (driveLink.textContent !== summary) driveLink.textContent = summary;
   if (raceLink.textContent !== latency) raceLink.textContent = latency;
   if (source === "mobile") {
-    resume.disabled = restart.disabled = contextLost || !ready;
+    resume.disabled = contextLost || environmentWaiting || !ready;
+    restart.disabled = contextLost || !ready;
     if ((!clock.paused || resumeUntil) && remote.timedOut(now))
       stop(false, "Se perdió la entrada del mando. Suelta los controles para continuar.");
   }
@@ -349,6 +371,7 @@ window.setInterval(() => {
 }, 25);
 
 async function mount() {
+  environmentWaiting = false;
   loading?.abort();
   const attempt = new AbortController();
   loading = attempt;
@@ -373,6 +396,8 @@ async function mount() {
     status.textContent = "Descargando modelos";
     const scene = await createRaceView(preview, attempt.signal, {
       quality: selected,
+      environment: runMenu.biome(),
+      paint: runMenu.paint,
       progress(completed, label) {
         if (loading !== attempt) return;
         progress.value = completed;
@@ -421,6 +446,42 @@ async function mount() {
     if (loading === attempt) loading = undefined;
   }
 }
+
+let environmentWaiting = false;
+preview.addEventListener("environment-wait", () => {
+  environmentWaiting = true;
+  if (!clock.paused || resumeUntil)
+    stop(false, "Preparando el siguiente entorno. Espera para continuar.");
+  resume.disabled = true;
+});
+preview.addEventListener("environment-ready", () => {
+  environmentWaiting = false;
+  resume.disabled = contextLost;
+});
+preview.addEventListener("environment-error", () => {
+  environmentWaiting = true;
+  element("summary").textContent =
+    "No se pudo descargar el entorno. Vuelve al menú para reintentar.";
+  resume.disabled = true;
+});
+element("finish-practice").onclick = () => {
+  if (clock.current.run.mode !== "practice") return;
+  clock.reset({ ...clock.current, phase: "finished" });
+  stop(true);
+};
+element("return-menu").onclick = () => {
+  clock.pause();
+  keys.clear();
+  resumeUntil = 0;
+  cancelAnimationFrame(raf);
+  clock.reset(runMenu.create());
+  root?.setAttribute("data-mode", "menu");
+  element("menu").hidden = false;
+  element("overlay").hidden = true;
+  hud.hidden = true;
+  pause.hidden = true;
+  void mount();
+};
 
 quality.onchange = () => {
   if (!isQuality(quality.value)) return;

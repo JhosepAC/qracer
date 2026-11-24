@@ -1,3 +1,4 @@
+import { openLane } from "../packages/game-core/src/traffic.ts";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -9,6 +10,7 @@ import { createRelay } from "../apps/relay-local/src/server.ts";
 
 const { values } = parseArgs({
   options: {
+    environment: { type: "string", default: "coast" },
     profiles: { type: "string", default: "low,balanced,high" },
     runs: { type: "string", default: "3" },
     seconds: { type: "string", default: "300" },
@@ -20,6 +22,7 @@ const profiles = values.profiles.split(",");
 const runs = Number(values.runs);
 const seconds = Number(values.seconds);
 if (
+  !["coast", "desert", "city"].includes(values.environment) ||
   !profiles.every((profile) => ["low", "balanced", "high"].includes(profile)) ||
   !Number.isInteger(runs) ||
   runs < 1 ||
@@ -35,7 +38,7 @@ const output = resolve(values.output);
 const staticDir = resolve("apps/web/dist");
 await mkdir(output, { recursive: true });
 const report = {
-  experiment: "F06-coastal-race",
+  experiment: "F08-world-race",
   sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   manifestSha256: createHash("sha256")
     .update(await readFile(resolve(staticDir, ".vite/manifest.json")))
@@ -47,7 +50,8 @@ const report = {
     memoryGiB: totalmem() / 2 ** 30,
     os: release(),
     seed: 310,
-    controls: "ArrowUp + ArrowLeft; Shift for two seconds mid-run",
+    environment: values.environment,
+    controls: "ArrowUp + reserved outer lane; Shift for two seconds mid-run",
     viewport: [1920, 1080],
   },
   runs: [],
@@ -183,10 +187,17 @@ try {
         const { port } = relay.server.address();
         await page.goto(`http://127.0.0.1:${port}/play/`);
         await page.waitForSelector(`#preview[data-graphics="ready"][data-quality="${profile}"]`);
+        if (values.environment !== "coast") {
+          await page.locator("#run-biome").selectOption(values.environment);
+          await page.waitForSelector(
+            `#preview[data-graphics="ready"][data-biome="${values.environment}"]`,
+          );
+        }
         if (run === 1) await page.screenshot({ path: resolve(output, `${profile}-menu.png`) });
         await page.getByRole("button", { name: "Salir a pista" }).click();
         await page.keyboard.down("ArrowUp");
-        await page.keyboard.down("ArrowLeft");
+        const lane = openLane(310);
+        if (lane !== 1) await page.keyboard.down(lane === 0 ? "ArrowLeft" : "ArrowRight");
         await page.evaluate(() => window.raceBenchmark.begin());
         await page.waitForTimeout(Math.floor(seconds * 500));
         await page.keyboard.down("Shift");

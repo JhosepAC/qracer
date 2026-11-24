@@ -40,10 +40,11 @@ export function coastalSky() {
     side: BackSide,
     depthWrite: false,
     toneMapped: false,
-    uniforms: lightUniforms(),
+    uniforms: { ...lightUniforms(), daylight: { value: 1 } },
     vertexShader,
     fragmentShader: `
       uniform vec3 horizon, zenith, sun;
+      uniform float daylight;
       varying vec3 world;
       void main() {
         vec3 ray = normalize(world - cameraPosition);
@@ -59,7 +60,7 @@ export function coastalSky() {
           (1. - smoothstep(.15, .48, height));
         sky = mix(sky, vec3(.36, .14, .19) + pow(light, 7.) * vec3(.42, .13, .02), veil * .52);
         float disc = smoothstep(.99958, .99974, light);
-        sky += vec3(1., .55, .23) * (.33 * pow(light, 92.) + disc);
+        sky += vec3(1., .55, .23) * (.33 * pow(light, 92.) + disc) * daylight;
 
         float headland = exp(-pow(abs(bearing + .61) * 2.65, 2.));
         float islands = exp(-pow(abs(bearing - .73) * 5.3, 2.)) +

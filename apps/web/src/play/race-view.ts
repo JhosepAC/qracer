@@ -1,3 +1,5 @@
+import { BIOMES, biomeAt, terrainTile, themes, type Biome } from "./biomes.ts";
+import { loadWorldAsset, worldAssets } from "./world-assets.ts";
 import {
   arc,
   createRace,
@@ -20,7 +22,6 @@ import {
   Color,
   DataTexture,
   DirectionalLight,
-  Float32BufferAttribute,
   FogExp2,
   Group,
   HemisphereLight,
@@ -51,10 +52,14 @@ import {
 import { qualities, type Quality } from "./quality.ts";
 import { raceAssetLoader } from "./race-assets.ts";
 
-const colors = [0x469baf, 0xd06b56, 0xbfc8d8, 0x69759e].map((value) => new Color(value));
+const colors = [0xffcb47, 0x72cce3, 0xe47e72, 0x58af88, 0x987ed0, 0x68757e].map(
+  (value) => new Color(value),
+);
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
 export interface RaceViewOptions {
   quality?: Quality;
+  environment?: Biome;
+  paint?: () => number;
   progress?: (completed: number, label: string) => void;
 }
 
@@ -97,7 +102,12 @@ function disposeObjects(roots: Object3D[]) {
 export async function createRaceView(
   container: HTMLElement,
   signal: AbortSignal,
-  { quality = "balanced", progress }: RaceViewOptions = {},
+  {
+    quality = "balanced",
+    progress,
+    environment: initialBiome = "coast",
+    paint: playerPaint,
+  }: RaceViewOptions = {},
 ) {
   const profile = qualities[quality];
   const scene = new Scene();
@@ -119,10 +129,15 @@ export async function createRaceView(
   let reflections: WebGLRenderTarget | undefined;
   let observer: ResizeObserver | undefined;
   let disposed = false;
+  let deferred = 0;
+  const assetAbort = new AbortController();
+  signal.addEventListener("abort", () => assetAbort.abort(), { once: true });
 
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    assetAbort.abort();
+    clearTimeout(deferred);
     observer?.disconnect();
     effects.dispose();
     sunlight.shadow.dispose();
@@ -135,7 +150,12 @@ export async function createRaceView(
 
   function batch(model: Object3D, count: number, modelSpace?: Object3D): Batch {
     return materialParts(model, modelSpace).map(({ geometry, material }) => {
+      if (material.name.includes("Paint") && "color" in material) {
+        material = material.clone();
+        (material as MeshStandardMaterial).color.set(0xffffff);
+      }
       const mesh = new InstancedMesh(geometry, material, count);
+      if (material.name.includes("Paint")) mesh.setColorAt(0, new Color(0xffffff));
       mesh.count = 0;
       mesh.frustumCulled = false;
       scene.add(mesh);
@@ -195,6 +215,15 @@ export async function createRaceView(
       scene.environmentIntensity = 0.55;
     }
     const sky = coastalSky();
+    const initialTheme = themes[initialBiome];
+    (scene.fog as FogExp2).color.set(initialTheme.horizon);
+    sunlight.intensity = initialTheme.light;
+    sunlight.color.set(initialTheme.sun);
+    renderer.toneMappingExposure = initialTheme.exposure;
+    sky.material.uniforms.horizon?.value.set(initialTheme.horizon);
+    sky.material.uniforms.zenith?.value.set(initialTheme.zenith);
+    const daylight = sky.material.uniforms.daylight;
+    if (daylight) daylight.value = initialBiome === "city" ? 0 : 1;
     scene.add(sky);
 
     const loader = raceAssetLoader(renderer);
@@ -223,7 +252,37 @@ export async function createRaceView(
     // The GLB scene owns the original pivot at wheel height, used by all instances.
     const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1, car);
     if (profile.shadow) for (const part of hero) part.castShadow = true;
-    const traffic = batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC, car);
+    const trafficModels = await loadWorldAsset("traffic", renderer, assetAbort.signal);
+    roots.push(trafficModels);
+    const traffic = [batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC, car)];
+    for (const kind of ["sedan", "van"]) {
+      let selected: Object3D | undefined;
+      trafficModels.traverse((node) => {
+        if (node.userData.qracer_asset === kind && node.userData.qracer_lod === 1) selected = node;
+      });
+      if (!selected) throw new Error("Falta una silueta de tráfico.");
+      traffic.push(batch(selected, MAX_TRAFFIC, trafficModels));
+    }
+    const indicatorModel = new Group();
+    const indicator = new Mesh(
+      new CircleGeometry(0.16, 8),
+      new MeshBasicMaterial({ color: 0xffaa28, depthTest: false }),
+    );
+    indicatorModel.add(indicator);
+    roots.push(indicatorModel);
+    const indicators = batch(indicatorModel, MAX_TRAFFIC);
+    let lastSegment = Number.NaN;
+    const world = worldAssets(renderer, assetAbort.signal, roots, batch, () => {
+      lastSegment = Number.NaN;
+    });
+    await world.load(initialBiome);
+    deferred = window.setTimeout(() => {
+      for (const key of BIOMES)
+        void world.load(key).catch(() => {
+          /* Retried before entering that biome. */
+        });
+    }, 500);
+    signal.addEventListener("abort", () => clearTimeout(deferred), { once: true });
     const palms = batch(assetRoot(coast, "qracer_asset", "palm"), 16);
     const cliffs = batch(assetRoot(coast, "qracer_asset", "cliff"), 5);
     const towers = batch(assetRoot(coast, "qracer_asset", "tower"), 5);
@@ -252,25 +311,6 @@ export async function createRaceView(
     const position = surface.getAttribute("position");
     for (let i = 0; i < uv.count; i++) uv.setXY(i, position.getX(i) / 4, -position.getZ(i) / 4);
     tile.add(new Mesh(surface, asphalt));
-    const ground = new PlaneGeometry(72, SEGMENT_LENGTH, 18, 12).rotateX(-Math.PI / 2);
-    ground.translate(-28, 0, 0);
-    const groundPoints = ground.getAttribute("position");
-    const groundColors = ground.getAttribute("uv");
-    const sage = new Color(0x6d7962);
-    const limestone = new Color(0xa68c6c);
-    const tint = new Color();
-    const groundPalette = new Float32Array(groundPoints.count * 3);
-    for (let i = 0; i < groundPoints.count; i++) {
-      const x = groundPoints.getX(i);
-      const wave = Math.cos(groundColors.getY(i) * Math.PI * 2);
-      groundPoints.setY(i, terrainHeight(x));
-      const stone = 0.26 + 0.18 * Math.sin(x * 0.63 + 0.7 * wave) + 0.13 * wave;
-      tint.copy(sage).lerp(limestone, stone);
-      tint.toArray(groundPalette, i * 3);
-    }
-    ground.setAttribute("color", new Float32BufferAttribute(groundPalette, 3));
-    ground.computeVertexNormals();
-    tile.add(new Mesh(ground, new MeshStandardMaterial({ vertexColors: true, roughness: 1 })));
     const seawall = assetRoot(props, "qracer_asset", "seawall").clone();
     seawall.position.set(8.8, -0.19, 0);
     tile.add(seawall);
@@ -284,6 +324,7 @@ export async function createRaceView(
       }
     roots.push(tile);
     const roads = new Map<number, Batch>();
+    const grounds = new Map<string, Batch>();
     for (const index of [0, 1, 4]) {
       const curve = segmentCurvature(index);
       const meshes = batch(tile, ROAD_SEGMENTS);
@@ -304,6 +345,12 @@ export async function createRaceView(
         }
       }
       roads.set(curve, meshes);
+      for (const biome of BIOMES) {
+        const terrain = new Group();
+        terrain.add(terrainTile(biome, curve));
+        roots.push(terrain);
+        grounds.set(`${biome}/${curve}`, batch(terrain, ROAD_SEGMENTS));
+      }
     }
 
     const shadowModel = new Group();
@@ -324,9 +371,28 @@ export async function createRaceView(
     const shadows = batch(shadowModel, MAX_TRAFFIC + 1);
     const ocean = coastalWater(quality !== "low");
     scene.add(ocean.mesh);
-    const moving = [hero, traffic, shadows, ...Object.values(hazards)].flat();
-    const environment = [...roads.values(), palms, cliffs, towers, villas, lamps].flat();
-    let lastSegment = Number.NaN;
+    const moving = [hero, ...traffic, indicators, shadows, ...Object.values(hazards)].flat();
+    const environment = [
+      ...roads.values(),
+      ...grounds.values(),
+      palms,
+      cliffs,
+      towers,
+      villas,
+      lamps,
+    ].flat();
+    const paintColor = new Color();
+    const themeColors = Object.fromEntries(
+      BIOMES.map((key) => [
+        key,
+        {
+          horizon: new Color(themes[key].horizon),
+          zenith: new Color(themes[key].zenith),
+          sun: new Color(themes[key].sun),
+        },
+      ]),
+    );
+    let waiting = false;
     let lastPrevious: Race | undefined;
     let lastCurrent: Race | undefined;
     let lastAlpha = 0;
@@ -337,15 +403,65 @@ export async function createRaceView(
       const distance = p.s + (c.s - p.s) * alpha;
       const lateral = p.d + (c.d - p.d) * alpha;
       const origin = Math.floor(distance / SEGMENT_LENGTH);
+      const biome = biomeAt(distance, initialBiome);
+      container.dataset.biome = biome;
+      if (!world.ready(biome) && !waiting) {
+        waiting = true;
+        container.dispatchEvent(new CustomEvent("environment-wait"));
+        void world
+          .load(biome)
+          .then(() => container.dispatchEvent(new CustomEvent("environment-ready")))
+          .catch(() => container.dispatchEvent(new CustomEvent("environment-error")))
+          .finally(() => {
+            waiting = false;
+          });
+      }
+      const target = themes[biome];
+      const fade = 0.025;
+      (scene.fog as FogExp2).color.lerp(themeColors[biome]?.horizon ?? horizon, fade);
+      sunlight.color.lerp(themeColors[biome]?.sun ?? horizon, fade);
+      sunlight.intensity += (target.light - sunlight.intensity) * fade;
+      renderer.toneMappingExposure += (target.exposure - renderer.toneMappingExposure) * fade;
+      sky.material.uniforms.horizon?.value.lerp(themeColors[biome]?.horizon ?? horizon, fade);
+      sky.material.uniforms.zenith?.value.lerp(themeColors[biome]?.zenith ?? horizon, fade);
+      ocean.mesh.visible = biome === "coast";
+      const daylight = sky.material.uniforms.daylight;
+      if (daylight) daylight.value += ((biome === "city" ? 0 : 1) - daylight.value) * fade;
       if (origin !== lastSegment) {
         lastSegment = origin;
-        for (const mesh of environment) mesh.count = 0;
+        for (const mesh of [...environment, ...world.batches.flat()]) mesh.count = 0;
         const first = firstSegment(distance);
         for (let i = first; i < first + ROAD_SEGMENTS; i++) {
           const start = i * SEGMENT_LENGTH;
           const road = roads.get(segmentCurvature(i));
           if (road) addPose(road, roadPose(start, 0, origin, pose));
+          const tileBiome = biomeAt(start + 12, initialBiome);
+          const ground = grounds.get(`${tileBiome}/${segmentCurvature(i)}`);
+          if (ground) addPose(ground, roadPose(start, 0, origin, pose));
           const decor = randomWord(current.seed, i, 11);
+          if (tileBiome !== "coast") {
+            const kit = world.kits.get(tileBiome);
+            if (kit) {
+              const model = kit[tileBiome === "city" ? "arcology" : "mesa"];
+              if (model && i % 2 === 0)
+                for (const side of [-1, 1])
+                  addPose(
+                    model,
+                    roadPose(start + 8, side * (tileBiome === "city" ? 22 : 30), origin, pose),
+                    -0.2,
+                    decor % 7,
+                    0.8 + (decor % 4) * 0.15,
+                  );
+              if (kit.cactus && i % 2 === 1)
+                addPose(kit.cactus, roadPose(start + 10, -11, origin, pose), 0, decor % 7, 0.8);
+              if (segmentCurvature(i) === 0 && i % 16 === 7 && kit.portal)
+                addPose(kit.portal, roadPose(start + 12, 0, origin, pose));
+              if (segmentCurvature(i) === 0 && i % 16 === 15 && kit.bridge)
+                addPose(kit.bridge, roadPose(start + 12, 0, origin, pose));
+            }
+            if (i % 2 === 0) addPose(lamps, roadPose(start + 6, 7.6, origin, pose), -0.14);
+            continue;
+          }
           if (i > first)
             addPose(
               palms,
@@ -376,7 +492,8 @@ export async function createRaceView(
               0.8 + (decor % 3) * 0.24,
             );
         }
-        for (const mesh of environment) mesh.instanceMatrix.needsUpdate = true;
+        for (const mesh of [...environment, ...world.batches.flat()])
+          mesh.instanceMatrix.needsUpdate = true;
         ocean.mesh.position.set(0, -1.4, -130);
       }
       for (const mesh of moving) mesh.count = 0;
@@ -390,6 +507,7 @@ export async function createRaceView(
         -c.lateral * 0.024,
         1,
         reducedMotion.matches ? 0 : -c.lateral * 0.012,
+        paintColor.set(playerPaint?.() ?? 0xffcb47),
       );
       addPose(shadows, pose, 0.015);
       const tick = previous.tick + (current.tick - previous.tick) * alpha;
@@ -402,7 +520,25 @@ export async function createRaceView(
             addPose(hazards[row.hazard], pose, 0.015);
             continue;
           }
-          addPose(traffic, pose, 0.02, 0, 1, 0, colors[vehicle.paint]);
+          addPose(
+            traffic[vehicle.kind ?? 0] ?? traffic[0] ?? [],
+            pose,
+            0.02,
+            0,
+            1,
+            0,
+            colors[vehicle.paint],
+          );
+          if (
+            vehicle.targetD !== undefined &&
+            vehicle.moveAt !== undefined &&
+            tick < vehicle.moveAt + 120 &&
+            Math.floor(tick / 20) % 2 === 0
+          ) {
+            const side = Math.sign(vehicle.targetD - vehicle.d);
+            roadPose(s - 2.05, trafficLateral(vehicle, tick) + side * 0.7, origin, pose);
+            addPose(indicators, pose, 0.75, 0);
+          }
           addPose(shadows, pose, 0.014);
         }
       }

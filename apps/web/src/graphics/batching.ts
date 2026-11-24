@@ -31,7 +31,7 @@ export function materialParts(
     const geometry = node.geometry.clone();
     // Meshopt can store normalized integers and put the decode transform on the
     // node. Baking that transform into another integer attribute clips positions.
-    for (const name of ["position", "normal", "tangent"]) {
+    for (const name of ["position", "normal", "tangent", "uv", "uv1", "color"]) {
       const source = geometry.getAttribute(name);
       if (!source || source.array instanceof Float32Array) continue;
       const values = new Float32Array(source.count * source.itemSize);
