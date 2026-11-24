@@ -1,0 +1,26 @@
+{
+  "traffic.glb": {
+    "bytes": 125776,
+    "sha256": "4a703b85d8e437a54d3e278a896b86b44ee4575132787ecc7496dcb0de5a830b",
+    "source": "assets-src/world/world.blend",
+    "license": "MIT",
+    "author": "QRacer contributors",
+    "pipeline": "Blender 5.3 MCP / glTF Transform 4.5.1 / Meshopt"
+  },
+  "desert.glb": {
+    "bytes": 56180,
+    "sha256": "e0ffa9eb687b7136df115d9ba55434a1dcab062cef7320577336333f9b735dc9",
+    "source": "assets-src/world/world.blend",
+    "license": "MIT",
+    "author": "QRacer contributors",
+    "pipeline": "Blender 5.3 MCP / glTF Transform 4.5.1 / Meshopt"
+  },
+  "city.glb": {
+    "bytes": 157372,
+    "sha256": "71d648079f6e2442738c35e2eff0b434e085e5760cdcc03c872f6aeaef8b14d3",
+    "source": "assets-src/world/world.blend",
+    "license": "MIT",
+    "author": "QRacer contributors",
+    "pipeline": "Blender 5.3 MCP / glTF Transform 4.5.1 / Meshopt"
+  }
+}
