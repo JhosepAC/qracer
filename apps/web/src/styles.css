@@ -262,3 +262,49 @@ footer {
     transition: none;
   }
 }
+
+.confirm-dialog {
+  color: #f3f6f3;
+  background: #17282f;
+  border: 1px solid #819699;
+  border-top: 3px solid #ffcb47;
+  border-radius: 6px;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+.confirm-dialog::backdrop {
+  background: #071116cf;
+}
+.confirm-dialog form > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+.data-dialog input[type="file"] {
+  min-height: 48px;
+  width: 100%;
+  min-width: 0;
+}
+.data-dialog input[type="file"]::file-selector-button {
+  min-height: 48px;
+  margin-inline-end: 0.5rem;
+  border: 1px solid #819699;
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: #1b292e;
+  color: #f3f6f3;
+  font: inherit;
+}
+.data-dialog p {
+  margin-block: 0.35rem;
+}
+.data-dialog label:has(input[type="file"]) {
+  display: grid;
+}
+.data-dialog details > div {
+  max-height: 18rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}

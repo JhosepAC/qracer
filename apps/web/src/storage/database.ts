@@ -141,6 +141,60 @@ export class ProgressStore {
     this.queue = task.catch(() => {});
     return task;
   }
+  replace(data: SaveData) {
+    const validated = readData(data);
+    return this.serial(async () => {
+      if (this.locked) throw new DataFault("future");
+      if (this.db)
+        await this.transaction(true, (tx, raw) => {
+          try {
+            readData(raw);
+          } catch (error) {
+            if (error instanceof DataFault && error.reason === "future") throw error;
+          }
+          tx.objectStore("state").put(validated, "profile");
+          tx.objectStore("ghosts").clear();
+          tx.objectStore("quarantine").clear();
+        });
+      this.data = validated;
+      this.backup = undefined;
+      this.status = this.db ? "saved" : "memory";
+      this.notify();
+    });
+  }
+  recovery() {
+    if (this.backup !== undefined) return Promise.resolve(this.backup);
+    const db = this.db;
+    if (!db?.objectStoreNames.contains("quarantine")) return Promise.resolve(undefined);
+    return new Promise<unknown>((resolve, reject) => {
+      const tx = db.transaction("quarantine");
+      const req = tx.objectStore("quarantine").get("profile");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  reset() {
+    return this.serial(async () => {
+      this.db?.close();
+      this.db = undefined;
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.deleteDatabase(DATABASE);
+        const timer = setTimeout(() => reject(new Error("Storage blocked")), 2500);
+        req.onsuccess = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        req.onerror = () => {
+          clearTimeout(timer);
+          reject(req.error);
+        };
+      });
+      this.locked = false;
+      this.backup = undefined;
+      this.data = freshData();
+      await this.load();
+    });
+  }
   commit(row: Summary): Promise<SaveData> {
     return this.serial(async () => {
       const memory = addResult(this.data, row);

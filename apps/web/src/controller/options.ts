@@ -1,4 +1,5 @@
 import { transportDiagnostic } from "../session/diagnostic.ts";
+import { confirmAction } from "../ui/confirm.ts";
 import type { DriveFrame } from "@qracer/session-core/wire";
 import type { DriveChannel } from "../session/drive-channel.ts";
 import { TiltInput } from "./tilt-input.ts";
@@ -26,6 +27,7 @@ export const optionsMarkup = `
     <label><input id="drive-awake" type="checkbox"> Mantener pantalla activa</label>
     <p id="wake-status"></p>
     <button type="button" id="drive-diagnostic">Guardar diagnóstico</button>
+    <button type="button" id="drive-reset">Restablecer ajustes del mando</button>
   </div>
 </details>`;
 
@@ -240,6 +242,23 @@ export function mountOptions(
     link.download = "qracer-mando.json";
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  field("drive-reset").onclick = async () => {
+    inputLost();
+    if (
+      !(await confirmAction(
+        "Restablecer ajustes del mando",
+        "Se restaurarán dirección, ayudas y vibración. La carrera permanecerá en pausa.",
+      ))
+    )
+      return;
+    try {
+      localStorage.removeItem(key);
+      location.reload();
+    } catch {
+      wakeStatus.textContent =
+        "No se pudo completar la operación. Revisa el almacenamiento del navegador.";
+    }
   };
 
   return {
