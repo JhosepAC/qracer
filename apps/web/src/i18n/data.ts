@@ -1,4 +1,5 @@
 export const dataEnglish: Readonly<Record<string, string>> = {
+  "Ajustar resolución para mantener fluidez": "Adjust resolution to keep motion smooth",
   "Actualización en curso. La carrera estará disponible enseguida.":
     "Update in progress. Racing will be available shortly.",
   "Jugar sin conexión": "Play offline",

@@ -188,6 +188,7 @@ export function mountDataMenu(onOpen: () => void) {
       for (const key of [
         "qracer.ghost.visible.v1",
         "qracer.graphics.quality",
+        "qracer.graphics.adaptive.v1",
         "qracer.presentation.v1",
         "qracer.locale.v1",
       ])

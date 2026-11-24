@@ -1,3 +1,4 @@
+import { ResolutionGovernor } from "./adaptive.ts";
 import { ghostMesh } from "./ghost-view.ts";
 import type { GhostPose } from "../storage/ghost.ts";
 import { BIOMES, biomeAt, terrainTile, themes, type Biome } from "./biomes.ts";
@@ -60,6 +61,7 @@ const colors = [0xffcb47, 0x72cce3, 0xe47e72, 0x58af88, 0x987ed0, 0x68757e].map(
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
 export interface RaceViewOptions {
   quality?: Quality;
+  adaptive?: () => boolean;
   ghost?: (tick: number) => GhostPose | undefined;
   comfort?: () => { stableCamera: boolean; reducedMotion: boolean; reducedFlashes: boolean };
   environment?: Biome;
@@ -108,6 +110,7 @@ export async function createRaceView(
   signal: AbortSignal,
   {
     quality = "balanced",
+    adaptive = () => true,
     progress,
     environment: initialBiome = "coast",
     paint: playerPaint,
@@ -116,6 +119,9 @@ export async function createRaceView(
   }: RaceViewOptions = {},
 ) {
   const profile = qualities[quality];
+  const governor = new ResolutionGovernor(quality);
+  let scale = 1;
+  let lastDraw = 0;
   const scene = new Scene();
   const roots: Object3D[] = [scene];
   const canvas = document.createElement("canvas");
@@ -596,7 +602,7 @@ export async function createRaceView(
       const w = Math.max(container.clientWidth, 1);
       const h = Math.max(container.clientHeight, 1);
       renderer.setPixelRatio(
-        Math.min(devicePixelRatio, profile.dpr, profile.width / w, profile.height / h),
+        Math.min(devicePixelRatio, profile.dpr, profile.width / w, profile.height / h) * scale,
       );
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
@@ -617,8 +623,26 @@ export async function createRaceView(
     });
     observer.observe(container);
     return {
-      draw(previous: Race, current: Race, alpha: number) {
+      draw(previous: Race, current: Race, alpha: number, frameAt?: number) {
+        const begin = performance.now();
+        const now = frameAt ?? begin;
         draw(previous, current, alpha);
+        if (previous === current || document.hidden) {
+          governor.pause();
+          lastDraw = 0;
+        } else {
+          const nextScale = governor.sample(
+            now,
+            lastDraw ? now - lastDraw : 0,
+            performance.now() - begin,
+            adaptive(),
+          );
+          if (nextScale !== scale) {
+            scale = nextScale;
+            resize();
+          }
+          lastDraw = now;
+        }
         lastPrevious = previous;
         lastCurrent = current;
         lastAlpha = alpha;
@@ -626,6 +650,8 @@ export async function createRaceView(
       dispose,
       canvas: renderer.domElement,
       stats: () => ({
+        resolutionScale: scale,
+        adaptive: adaptive(),
         ghostVisible: ghost.count > 0,
         calls: renderer.info.render.calls,
         triangles: renderer.info.render.triangles,

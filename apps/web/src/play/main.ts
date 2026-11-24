@@ -50,6 +50,7 @@ root.innerHTML = `
           <option value="high">Alto</option>
         </select>
       </label>
+      <label class="ghost-option"><input type="checkbox" id="graphics-adaptive" checked> Ajustar resolución para mantener fluidez</label>
       <details class="race-keyboard"><summary>Controles de teclado</summary>
         <dl><div><dt>Dirección</dt><dd><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dd></div>
         <div><dt>Acelera / frena</dt><dd><kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
@@ -140,6 +141,15 @@ const status = element("graphics-status");
 const progress = element<HTMLProgressElement>("graphics-progress");
 const quality = element<HTMLSelectElement>("graphics-quality");
 quality.value = loadQuality();
+const adaptive = element<HTMLInputElement>("graphics-adaptive");
+try {
+  adaptive.checked = localStorage.getItem("qracer.graphics.adaptive.v1") !== "false";
+} catch {}
+adaptive.onchange = () => {
+  try {
+    localStorage.setItem("qracer.graphics.adaptive.v1", String(adaptive.checked));
+  } catch {}
+};
 const score = element("score");
 const distance = element("distance");
 const speed = element("speed");
@@ -279,7 +289,7 @@ function frame(now: number) {
   const alpha = clock.frame(now);
   if (clock.current.phase === "finished") return stop(true);
   if (clock.paused) return stop();
-  view.draw(clock.previous, clock.current, alpha);
+  view.draw(clock.previous, clock.current, alpha, now);
   if (now - lastHud >= 100) {
     lastHud = now;
     updateHud();
@@ -429,6 +439,7 @@ async function mount() {
     status.textContent = "Descargando modelos";
     const scene = await createRaceView(preview, attempt.signal, {
       quality: selected,
+      adaptive: () => adaptive.checked,
       environment: runMenu.biome(),
       paint: runMenu.paint,
       comfort: () => presentation.settings,
