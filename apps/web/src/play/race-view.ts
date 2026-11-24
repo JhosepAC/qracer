@@ -215,6 +215,15 @@ export async function createRaceView(
       scene.environmentIntensity = 0.55;
     }
     const sky = coastalSky();
+    const initialTheme = themes[initialBiome];
+    (scene.fog as FogExp2).color.set(initialTheme.horizon);
+    sunlight.intensity = initialTheme.light;
+    sunlight.color.set(initialTheme.sun);
+    renderer.toneMappingExposure = initialTheme.exposure;
+    sky.material.uniforms.horizon?.value.set(initialTheme.horizon);
+    sky.material.uniforms.zenith?.value.set(initialTheme.zenith);
+    const daylight = sky.material.uniforms.daylight;
+    if (daylight) daylight.value = initialBiome === "city" ? 0 : 1;
     scene.add(sky);
 
     const loader = raceAssetLoader(renderer);
