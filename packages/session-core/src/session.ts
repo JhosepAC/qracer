@@ -341,6 +341,8 @@ export class RoomSession {
   private transport(peer: Peer, frame: TransportFrame, now: number): Effect[] {
     const state = this.state;
     const { host, controller, epoch } = state;
+    if (frame.type === "HEARTBEAT" && frame.epoch === epoch && this.identified(peer.id))
+      return [{ id: peer.id, frame }];
     if (
       !host ||
       !controller?.id ||
