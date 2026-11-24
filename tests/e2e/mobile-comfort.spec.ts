@@ -95,6 +95,20 @@ test("supports one-hand driving, brake priority and safe pauses on a small hands
     );
     expect(saved.oneHand).toBe(true);
     expect(saved.reducedFlashes).toBe(true);
+    await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
+    await phone.getByRole("button", { name: "Restablecer ajustes del mando" }).click();
+    await phone.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
+    await expect(phone.getByLabel("Modo de una mano (ayuda)")).toBeChecked();
+    await phone.getByRole("button", { name: "Restablecer ajustes del mando" }).click();
+    const reset = phone.waitForEvent("load");
+    await phone.getByRole("dialog").getByRole("button", { name: "Confirmar" }).click();
+    await reset;
+    expect(
+      await phone.evaluate(() =>
+        JSON.parse(localStorage.getItem("qracer.controller.settings.v1") ?? "{}"),
+      ),
+    ).toMatchObject({ oneHand: false, assist: false, invert: false });
+    await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
   } finally {
     await phone.close();
   }
