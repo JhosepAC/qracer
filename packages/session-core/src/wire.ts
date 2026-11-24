@@ -1,8 +1,10 @@
+import { parseTransport, type TransportFrame, SIGNAL_BYTES } from "./transport.ts";
+export * from "./transport.ts";
 import { type DriveFrame, parseDriveFrame } from "./drive.ts";
 export * from "./drive.ts";
 
-export const SESSION_VERSION = 2;
-export const SESSION_BYTES = 1024;
+export const SESSION_VERSION = 3;
+export const SESSION_BYTES = SIGNAL_BYTES;
 export const ROOM_ID = /^[0-9a-f]{32}$/;
 export const TOKEN = /^[0-9a-f]{64}$/;
 export const INVITE_MS = 120_000;
@@ -33,18 +35,21 @@ export interface Creation {
 
 export type ClientFrame =
   | DriveFrame
+  | TransportFrame
   | { type: "AUTH"; version: number; role: Role; token: string }
   | { type: "ROTATE" | "REVOKE" | "END" }
   | { type: "APPROVE" | "REJECT"; request: string };
 
 export type ServerFrame =
   | DriveFrame
+  | TransportFrame
   | {
       type: "STATE";
       phase: Phase;
       epoch: number;
       until: number;
       linked: boolean;
+      route?: "wss" | "rtc";
       request?: string;
       code?: string;
     }
@@ -85,6 +90,6 @@ export function parseClient(raw: string): ClientFrame | undefined {
     case "END":
       return { type };
     default:
-      return parseDriveFrame(msg);
+      return parseTransport(msg) ?? (raw.length <= 1024 ? parseDriveFrame(msg) : undefined);
   }
 }

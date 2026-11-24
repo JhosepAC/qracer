@@ -1,3 +1,4 @@
+import { isTransport } from "@qracer/session-core/wire";
 import { controlsMarkup, mountDrive } from "./drive.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
 import { ROOM_ID, TOKEN } from "@qracer/session-core/wire";
@@ -83,7 +84,7 @@ function connect(key: RoomToken, resume = false) {
       if (frame.type === "RESUME") remember({ room: key.room, token: frame.token });
       if (frame.type === "ERROR") status.textContent = sessionError(frame.code);
       if (frame.type !== "STATE") {
-        if ("epoch" in frame) drive.receive(frame);
+        if ("epoch" in frame && !isTransport(frame)) drive.receive(frame);
         return;
       }
       if (frame.phase === "connected")

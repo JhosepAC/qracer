@@ -43,7 +43,7 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
       },
     };
   }
-  const auth = (peer, role, token, version = 2) =>
+  const auth = (peer, role, token, version = 3) =>
     peer.send({ type: "AUTH", role, token, version });
   const state = (peer, phase, epoch) =>
     peer.next("STATE", (f) => f.phase === phase && (epoch === undefined || f.epoch === epoch));
@@ -57,7 +57,7 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
     assert.equal(response.status, 201);
     assert.equal(response.headers.get("cache-control"), "no-store");
     const { room, hostToken, version } = await response.json();
-    assert.equal(version, 2);
+    assert.equal(version, 3);
     assert.match(room, /^[a-f0-9]{32}$/);
     await assert.rejects(() => connect(room, "https://unlisted.invalid"));
     const stranger = await connect(room);
