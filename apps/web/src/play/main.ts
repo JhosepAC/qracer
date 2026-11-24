@@ -1,3 +1,4 @@
+import { mountDataMenu } from "./data-menu.ts";
 import { mountLocale } from "../i18n/locale.ts";
 import { keyboardInput, isDrivingKey } from "./keyboard.ts";
 import { RaceAudio } from "./audio.ts";
@@ -107,6 +108,9 @@ const presentation = mountPresentation(sound, () => {
 const runMenu = mountRunMenu(root, () => {
   clock.reset(runMenu.create());
   void mount();
+});
+mountDataMenu(() => {
+  if (!clock.paused || resumeUntil) stop();
 });
 const preview = element("preview");
 const start = element<HTMLButtonElement>("start");

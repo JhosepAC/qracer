@@ -1,9 +1,11 @@
+import { dataEnglish, dataPatterns } from "./data.ts";
 import { english } from "./controller.ts";
 import { playEnglish } from "./play.ts";
 
 export type Locale = "es" | "en";
-const messages = { ...english, ...playEnglish };
+const messages = { ...english, ...playEnglish, ...dataEnglish };
 const dynamic: readonly [RegExp, (match: RegExpMatchArray) => string][] = [
+  ...dataPatterns,
   [/^Integridad (\d+\/\d+)$/, (m) => `Integrity ${m[1]}`],
   [/^(\d+) puntos$/, (m) => `${m[1]} points`],
   [/^Caduca en (\d+:\d{2})$/, (m) => `Expires in ${m[1]}`],
