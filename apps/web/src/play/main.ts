@@ -1,3 +1,6 @@
+import { mountOffline } from "../offline/menu.ts";
+import { evictOptional, localRelay, updateBlocked } from "../offline/client.ts";
+import { progressStore } from "../storage/database.ts";
 import { mountResultCard, snapshot } from "./result-card.ts";
 import { mountDataMenu } from "./data-menu.ts";
 import { mountLocale } from "../i18n/locale.ts";
@@ -88,8 +91,18 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 const pair = element<HTMLButtonElement>("host-pair");
-pair.hidden = !featureFlags.pairing.enabled;
+function refreshPairing() {
+  pair.hidden = !featureFlags.pairing.enabled || (!navigator.onLine && !localRelay());
+}
+window.addEventListener("online", refreshPairing);
+window.addEventListener("offline", refreshPairing);
+refreshPairing();
 pair.onclick = async () => {
+  if (!navigator.onLine && !localRelay()) {
+    element("graphics-status").textContent =
+      "Sin Internet, usa teclado o la edición con relay local en tu red.";
+    return;
+  }
   try {
     pair.disabled = true;
     const { mountPairing } = await import("../session/host.ts");
@@ -102,6 +115,8 @@ pair.onclick = async () => {
   }
 };
 
+const offline = mountOffline();
+progressStore.freeOptional = evictOptional;
 const card = mountResultCard();
 const sound = new RaceAudio();
 const presentation = mountPresentation(sound, () => {
@@ -274,6 +289,7 @@ function frame(now: number) {
 
 function run(reset: boolean) {
   if (
+    updateBlocked() ||
     !view ||
     contextLost ||
     environmentWaiting ||
@@ -343,7 +359,8 @@ function refreshMobile(now: number) {
   const linked = channel.epoch !== undefined;
   const ready = linked && remote.ready(now);
   startMobile.hidden = driveLink.hidden = !linked;
-  startMobile.disabled = !view || contextLost || !ready;
+  startMobile.disabled =
+    !view || contextLost || !ready || (root?.dataset.mode === "menu" && updateBlocked());
   const estimate = channel.sync.estimate(now);
   const latency = estimate
     ? `${transportLabel()} · RTT ${Math.round(estimate.rtt)} ms`
@@ -448,6 +465,7 @@ async function mount() {
     progress.hidden = true;
     start.disabled = resume.disabled = restart.disabled = false;
     status.textContent = "";
+    offline.start();
   } catch (error) {
     if (loading !== attempt || (attempt.signal.aborted && !timedOut)) return;
     view?.dispose();
@@ -458,7 +476,9 @@ async function mount() {
       ? "El circuito tardó demasiado en cargar. Recarga para reintentar."
       : error instanceof Error && error.message.startsWith("Activa WebGL 2")
         ? error.message
-        : "No se pudo cargar el circuito. Recarga para reintentar.";
+        : !navigator.onLine
+          ? "Este entorno no está descargado. Elige Costa o descarga los entornos con conexión."
+          : "No se pudo cargar el circuito. Recarga para reintentar.";
   } finally {
     window.clearTimeout(deadline);
     if (loading === attempt) loading = undefined;
@@ -507,6 +527,7 @@ element("return-menu").onclick = () => {
   cancelAnimationFrame(raf);
   clock.reset(runMenu.create());
   root?.setAttribute("data-mode", "menu");
+  void offline.refresh();
   element("menu").hidden = false;
   element("overlay").hidden = true;
   hud.hidden = true;
@@ -571,6 +592,9 @@ window.addEventListener("pagehide", () => {
   delete preview.dataset.graphics;
   delete preview.dataset.renderStats;
   start.disabled = resume.disabled = restart.disabled = true;
+});
+document.addEventListener("qracer:offline", () => {
+  if (root?.dataset.mode === "menu") start.disabled = !view || contextLost || updateBlocked();
 });
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) void mount();

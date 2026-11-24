@@ -145,6 +145,9 @@ test("evicts optional ghosts on quota and continues in memory if retry cannot pe
   await page.evaluate(() => {
     const original = IDBObjectStore.prototype.put;
     let first = true;
+    window.f10.freeOptional = async () => {
+      document.body.dataset.optionalFreed = "true";
+    };
     IDBObjectStore.prototype.put = function (...args) {
       if (this.name === "state" && first) {
         first = false;
@@ -154,6 +157,7 @@ test("evicts optional ghosts on quota and continues in memory if retry cannot pe
     };
   });
   await page.evaluate((row) => window.f10.commit(row), row("retried"));
+  await expect(page.locator("body")).toHaveAttribute("data-optional-freed", "true");
   expect(await page.evaluate(() => window.f10.status)).toBe("saved");
   expect(
     await page.evaluate(
