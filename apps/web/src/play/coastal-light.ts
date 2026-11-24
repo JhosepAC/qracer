@@ -30,9 +30,9 @@ const vertexShader = `
 `;
 
 const lightUniforms = () => ({
-  horizon: { value: horizon },
-  zenith: { value: zenith },
-  sun: { value: sunDirection },
+  horizon: { value: horizon.clone() },
+  zenith: { value: zenith.clone() },
+  sun: { value: sunDirection.clone() },
 });
 
 export function coastalSky() {

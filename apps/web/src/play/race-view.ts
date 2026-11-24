@@ -1,3 +1,4 @@
+import { disposeObjects, materialTextures, resourceBytes } from "../graphics/resources.ts";
 import { ResolutionGovernor } from "./adaptive.ts";
 import { ghostMesh } from "./ghost-view.ts";
 import type { GhostPose } from "../storage/ghost.ts";
@@ -39,7 +40,6 @@ import {
   PlaneGeometry,
   RGBAFormat,
   Scene,
-  Texture,
   type WebGLRenderTarget,
   WebGLRenderer,
 } from "three";
@@ -87,24 +87,6 @@ function shadowTexture() {
   return texture;
 }
 
-function disposeObjects(roots: Object3D[]) {
-  const geometries = new Set<Mesh["geometry"]>();
-  const materials = new Set<Material>();
-  const textures = new Set<Texture>();
-  for (const root of roots)
-    root.traverse((node) => {
-      if (!(node instanceof Mesh)) return;
-      if (node instanceof InstancedMesh) node.dispose();
-      geometries.add(node.geometry);
-      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
-        materials.add(material);
-        for (const value of Object.values(material))
-          if (value instanceof Texture) textures.add(value);
-      }
-    });
-  for (const resource of [...geometries, ...materials, ...textures]) resource.dispose();
-}
-
 export async function createRaceView(
   container: HTMLElement,
   signal: AbortSignal,
@@ -118,10 +100,16 @@ export async function createRaceView(
     comfort,
   }: RaceViewOptions = {},
 ) {
+  const started = performance.now();
   const profile = qualities[quality];
   const governor = new ResolutionGovernor(quality);
   let scale = 1;
   let lastDraw = 0;
+  let clearWorld: (() => void) | undefined;
+  let resourcesDirty = true;
+  let usage = { geometryBytesEstimate: 0, textureBytesEstimate: 0 };
+  let worldOrigin = 0;
+  let localCoordinateMax = 0;
   const scene = new Scene();
   const roots: Object3D[] = [scene];
   const canvas = document.createElement("canvas");
@@ -151,10 +139,12 @@ export async function createRaceView(
     assetAbort.abort();
     clearTimeout(deferred);
     observer?.disconnect();
-    effects.dispose();
     sunlight.shadow.dispose();
     reflections?.dispose();
     disposeObjects(roots);
+    clearWorld?.();
+    scene.clear();
+    roots.length = 0;
     renderer.dispose();
     renderer.domElement.remove();
     renderer.forceContextLoss();
@@ -184,6 +174,7 @@ export async function createRaceView(
     tilt = 0,
     color?: Color,
   ) {
+    localCoordinateMax = Math.max(localCoordinateMax, Math.abs(point.x), Math.abs(point.z));
     dummy.position.set(point.x, height, point.z);
     dummy.rotation.set(0, -point.heading + turn, tilt);
     dummy.scale.setScalar(scale);
@@ -239,23 +230,29 @@ export async function createRaceView(
     scene.add(sky);
 
     const loader = raceAssetLoader(renderer);
-    async function load(name: string, completed: number) {
-      const response = await fetch(`/assets/coast/${name}.glb`, {
-        signal,
-      });
+    let completed = 1;
+    async function load(name: string) {
+      const response = await fetch(`/assets/coast/${name}.glb`, { signal: assetAbort.signal });
       if (!response.ok) throw new Error("El servidor no pudo entregar los modelos del circuito.");
       const glb = await response.arrayBuffer();
       if (glb.byteLength > 8 * 1024 * 1024) throw new Error("Recurso fuera de presupuesto.");
       const asset = await loader.models.parseAsync(glb, "");
+      if (assetAbort.signal.aborted) {
+        disposeObjects([asset.scene]);
+        assetAbort.signal.throwIfAborted();
+      }
       roots.push(asset.scene);
-      signal.throwIfAborted();
-      progress?.(completed, "Preparando modelos");
+      progress?.(++completed, "Preparando modelos");
       return asset.scene;
     }
-
+    const requests = [load("coupe"), load("coast"), load("props")] as const;
     const [car, coast, props] = await (async () => {
       try {
-        return [await load("coupe", 2), await load("coast", 3), await load("props", 4)] as const;
+        return await Promise.all(requests);
+      } catch (error) {
+        assetAbort.abort();
+        await Promise.allSettled(requests);
+        throw error;
       } finally {
         loader.dispose();
       }
@@ -263,10 +260,24 @@ export async function createRaceView(
     // Meshopt places each coupe LOD's decode transform on its tagged root.
     // The GLB scene owns the original pivot at wheel height, used by all instances.
     const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1, car);
-    if (profile.shadow) for (const part of hero) part.castShadow = true;
     const ghost = ghostMesh(car);
     const ghostBatch = [ghost];
     scene.add(ghost);
+    const shadowProxy = profile.shadow
+      ? new InstancedMesh(
+          ghost.geometry,
+          new MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+          1,
+        )
+      : undefined;
+    if (shadowProxy) {
+      shadowProxy.castShadow = true;
+      shadowProxy.frustumCulled = false;
+      shadowProxy.count = 0;
+      shadowProxy.renderOrder = 100;
+      scene.add(shadowProxy);
+    }
+    const proxyBatch = shadowProxy ? [shadowProxy] : [];
     const trafficModels = await loadWorldAsset("traffic", renderer, assetAbort.signal);
     roots.push(trafficModels);
     const traffic = [batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC, car)];
@@ -287,9 +298,23 @@ export async function createRaceView(
     roots.push(indicatorModel);
     const indicators = batch(indicatorModel, MAX_TRAFFIC);
     let lastSegment = Number.NaN;
-    const world = worldAssets(renderer, assetAbort.signal, roots, batch, () => {
-      lastSegment = Number.NaN;
-    });
+    const world = worldAssets(
+      renderer,
+      assetAbort.signal,
+      roots,
+      batch,
+      () => {
+        lastSegment = Number.NaN;
+        resourcesDirty = true;
+      },
+      async (model) => {
+        if (assetAbort.signal.aborted) assetAbort.signal.throwIfAborted();
+        for (const texture of materialTextures(model)) renderer.initTexture(texture);
+        await renderer.compileAsync(scene, camera);
+        assetAbort.signal.throwIfAborted();
+      },
+    );
+    clearWorld = world.clear;
     await world.load(initialBiome);
     deferred = window.setTimeout(() => {
       for (const key of BIOMES)
@@ -386,7 +411,14 @@ export async function createRaceView(
     const shadows = batch(shadowModel, MAX_TRAFFIC + 1);
     const ocean = coastalWater(quality !== "low");
     scene.add(ocean.mesh);
-    const moving = [hero, ...traffic, indicators, shadows, ...Object.values(hazards)].flat();
+    const moving = [
+      hero,
+      proxyBatch,
+      ...traffic,
+      indicators,
+      shadows,
+      ...Object.values(hazards),
+    ].flat();
     const environment = [
       ...roads.values(),
       ...grounds.values(),
@@ -413,17 +445,23 @@ export async function createRaceView(
     let lastAlpha = 0;
 
     function draw(previous: Race, current: Race, alpha: number) {
+      if (disposed) return;
       const p = previous.driver;
       const c = current.driver;
       const distance = p.s + (c.s - p.s) * alpha;
       const lateral = p.d + (c.d - p.d) * alpha;
       const origin = Math.floor(distance / SEGMENT_LENGTH);
+      worldOrigin = origin * SEGMENT_LENGTH;
       const biome = biomeAt(distance, initialBiome);
-      container.dataset.biome = biome;
-      container.dataset.stableCamera = String(
+      if (container.dataset.biome !== biome) container.dataset.biome = biome;
+      const stableCamera = String(
         comfort?.().stableCamera || reducedMotion.matches || comfort?.().reducedMotion || false,
       );
-      container.dataset.reducedFlashes = String(comfort?.().reducedFlashes || false);
+      const reducedFlashes = String(comfort?.().reducedFlashes || false);
+      if (container.dataset.stableCamera !== stableCamera)
+        container.dataset.stableCamera = stableCamera;
+      if (container.dataset.reducedFlashes !== reducedFlashes)
+        container.dataset.reducedFlashes = reducedFlashes;
       if (!world.ready(biome) && !waiting) {
         waiting = true;
         container.dispatchEvent(new CustomEvent("environment-wait"));
@@ -448,7 +486,8 @@ export async function createRaceView(
       if (daylight) daylight.value += ((biome === "city" ? 0 : 1) - daylight.value) * fade;
       if (origin !== lastSegment) {
         lastSegment = origin;
-        for (const mesh of [...environment, ...world.batches.flat()]) mesh.count = 0;
+        const activeEnvironment = [...environment, ...world.batches.flat()];
+        for (const mesh of activeEnvironment) mesh.count = 0;
         const first = firstSegment(distance);
         for (let i = first; i < first + ROAD_SEGMENTS; i++) {
           const start = i * SEGMENT_LENGTH;
@@ -511,8 +550,10 @@ export async function createRaceView(
               0.8 + (decor % 3) * 0.24,
             );
         }
-        for (const mesh of [...environment, ...world.batches.flat()])
-          mesh.instanceMatrix.needsUpdate = true;
+        for (const mesh of activeEnvironment) {
+          mesh.visible = mesh.count > 0;
+          if (mesh.visible) mesh.instanceMatrix.needsUpdate = true;
+        }
         ocean.mesh.position.set(0, -1.4, -130);
       }
       for (const mesh of moving) mesh.count = 0;
@@ -529,6 +570,16 @@ export async function createRaceView(
           ? 0
           : -c.lateral * 0.012,
         paintColor.set(playerPaint?.() ?? 0xffcb47),
+      );
+      addPose(
+        proxyBatch,
+        pose,
+        0.025,
+        -c.lateral * 0.024,
+        1,
+        reducedMotion.matches || comfort?.().reducedMotion || comfort?.().stableCamera
+          ? 0
+          : -c.lateral * 0.012,
       );
       addPose(shadows, pose, 0.015);
       const tick = previous.tick + (current.tick - previous.tick) * alpha;
@@ -574,7 +625,10 @@ export async function createRaceView(
           addPose(shadows, pose, 0.014);
         }
       }
+      ghost.visible = ghost.count > 0;
       for (const mesh of moving) {
+        mesh.visible = mesh.count > 0;
+        if (!mesh.visible) continue;
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
@@ -599,6 +653,7 @@ export async function createRaceView(
     }
 
     function resize() {
+      if (disposed) return;
       const w = Math.max(container.clientWidth, 1);
       const h = Math.max(container.clientHeight, 1);
       renderer.setPixelRatio(
@@ -611,11 +666,16 @@ export async function createRaceView(
 
     container.append(renderer.domElement);
     resize();
+    const warming = performance.now();
+    for (const model of [car, coast, props, trafficModels])
+      for (const texture of materialTextures(model)) renderer.initTexture(texture);
     progress?.(5, "Precalentando gráficos");
     await renderer.compileAsync(scene, camera);
     signal.throwIfAborted();
     const initial = createRace();
     draw(initial, initial, 0);
+    const shaderWarmupMs = performance.now() - warming;
+    const startupMs = performance.now() - started;
     progress?.(6, "Circuito listo");
     observer = new ResizeObserver(() => {
       resize();
@@ -649,17 +709,33 @@ export async function createRaceView(
       },
       dispose,
       canvas: renderer.domElement,
-      stats: () => ({
-        resolutionScale: scale,
-        adaptive: adaptive(),
-        ghostVisible: ghost.count > 0,
-        calls: renderer.info.render.calls,
-        triangles: renderer.info.render.triangles,
-        geometries: renderer.info.memory.geometries,
-        textures: renderer.info.memory.textures,
-        width: renderer.domElement.width,
-        height: renderer.domElement.height,
-      }),
+      stats: () => {
+        if (resourcesDirty) {
+          usage = resourceBytes(
+            roots,
+            [reflections?.texture, sunlight.shadow.map?.texture].filter(
+              (texture): texture is NonNullable<typeof texture> => !!texture,
+            ),
+          );
+          resourcesDirty = false;
+        }
+        return {
+          ...usage,
+          startupMs,
+          shaderWarmupMs,
+          worldOrigin,
+          localCoordinateMax,
+          resolutionScale: scale,
+          adaptive: adaptive(),
+          ghostVisible: ghost.count > 0,
+          calls: renderer.info.render.calls,
+          triangles: renderer.info.render.triangles,
+          geometries: renderer.info.memory.geometries,
+          textures: renderer.info.memory.textures,
+          width: renderer.domElement.width,
+          height: renderer.domElement.height,
+        };
+      },
     };
   } catch (error) {
     dispose();
