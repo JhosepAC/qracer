@@ -1,4 +1,9 @@
 export const dataEnglish: Readonly<Record<string, string>> = {
+  "Mostrar fantasma local": "Show local ghost",
+  "Contrarreloj y diario: compara tu mejor recorrido compatible. Sin colisiones ni ventajas.":
+    "Time trial and daily: compare your best compatible run. No collisions or advantages.",
+  "Fantasma local": "Local ghost",
+  "tu mejor recorrido": "your best run",
   "Restablecer ajustes del mando": "Reset controller preferences",
   "Se restaurarán dirección, ayudas y vibración. La carrera permanecerá en pausa.":
     "Steering, assistance and vibration will be reset. The race will stay paused.",

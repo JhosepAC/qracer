@@ -1,3 +1,4 @@
+import { GhostRecorder, type GhostPlayback } from "../storage/ghost.ts";
 import { progressStore } from "../storage/database.ts";
 import { addResult, summarize, newRunId } from "../storage/model.ts";
 import {
@@ -33,6 +34,8 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
       <label>Semilla<input id="run-seed" type="number" min="-2147483648" max="2147483647" step="1" value="310"></label>
       <label>Pintura<select id="run-paint"></select></label>
     </div>
+    <label class="ghost-option"><input type="checkbox" id="run-ghost" checked> Mostrar fantasma local</label>
+    <p class="fine-print">Contrarreloj y diario: compara tu mejor recorrido compatible. Sin colisiones ni ventajas.</p>
     <p id="storage-status" class="fine-print" role="status"></p>
     <p id="run-description" class="fine-print"></p>
     <details><summary>Objetivos y pinturas</summary><div id="run-objectives"></div>
@@ -51,6 +54,31 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
   const description = field("run-description");
   let progress = progressStore.data.progress;
   let runId = newRunId();
+  let recorder: GhostRecorder | undefined;
+  let playback: GhostPlayback | undefined;
+  let ghostCategory = "";
+  let generation = 0;
+  const visible = field<HTMLInputElement>("run-ghost");
+  try {
+    visible.checked = localStorage.getItem("qracer.ghost.visible.v1") !== "false";
+  } catch {
+    /* Optional preference. */
+  }
+  visible.onchange = () => {
+    try {
+      localStorage.setItem("qracer.ghost.visible.v1", String(visible.checked));
+    } catch {
+      /* Keep in this tab. */
+    }
+  };
+  function loadGhost(category: string) {
+    ghostCategory = category;
+    playback = undefined;
+    const current = generation;
+    void progressStore.ghost(category).then((value) => {
+      if (current === generation && category === ghostCategory) playback = value;
+    });
+  }
   function currentMode(): Mode {
     return MODES.find((key) => key === mode.value) ?? "infinite";
   }
@@ -115,6 +143,13 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
   redraw();
   return {
     ready,
+    track(race: Race) {
+      if (recorder) {
+        if (race.run.category !== ghostCategory) loadGhost(race.run.category);
+        recorder.capture(race);
+      }
+    },
+    ghost: (tick: number) => (visible.checked ? playback?.at(tick) : undefined),
     biome: currentBiome,
     paint: () =>
       unlockedPaints(progress)[Number(paint.value)]
@@ -123,11 +158,17 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
     create() {
       runId = newRunId();
       const value = Number(seed.value);
-      return createRace(
+      const race = createRace(
         Number.isSafeInteger(value) && value >= -2147483648 && value <= 2147483647 ? value : 310,
         driving,
         { mode: currentMode() },
       );
+      generation++;
+      playback = undefined;
+      ghostCategory = "";
+      recorder = Number.isFinite(race.run.limit) ? new GhostRecorder(race.run.limit) : undefined;
+      if (recorder) loadGhost(race.run.category);
+      return race;
     },
     finish(race: Race, assisted: boolean) {
       const run = assisted
@@ -140,7 +181,7 @@ export function mountRunMenu(root: HTMLElement, changed: () => void) {
       const before = unlockedPaints(progress);
       const row = summarize(runId, { ...race, run });
       progress = addResult({ ...progressStore.data, progress }, row).progress;
-      void progressStore.commit(row);
+      void progressStore.commit(row, recorder?.finish({ ...race, run }, row.ended));
       const unlocked = PAINTS.filter(
         (_, index) => !before[index] && unlockedPaints(progress)[index],
       );

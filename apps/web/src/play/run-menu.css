@@ -67,3 +67,41 @@
     margin-top: 1rem;
   }
 }
+
+.ghost-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+}
+.ghost-option input {
+  width: 24px;
+  height: 24px;
+  accent-color: #67e8db;
+}
+#ghost-hud {
+  left: 4vw;
+  top: 13rem;
+  transform: none;
+  font-size: 0.85rem;
+  max-width: 42vw;
+  line-height: 1.3;
+}
+
+@media (max-height: 500px) {
+  #app[data-mode="playing"] .race-bar {
+    padding: 0.35rem 0.5rem;
+    gap: 0.25rem;
+  }
+  #app[data-mode="playing"] .race-bar :is(.brand, kbd),
+  #app[data-mode="playing"] .locale-picker span {
+    display: none;
+  }
+  #app[data-mode="playing"] .race-bar button {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+  #app[data-mode="playing"] #presentation-open {
+    margin-inline-start: 0;
+  }
+}

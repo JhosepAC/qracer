@@ -170,7 +170,12 @@ export function mountDataMenu(onOpen: () => void) {
         ))
       )
         return;
-      for (const key of ["qracer.graphics.quality", "qracer.presentation.v1", "qracer.locale.v1"])
+      for (const key of [
+        "qracer.ghost.visible.v1",
+        "qracer.graphics.quality",
+        "qracer.presentation.v1",
+        "qracer.locale.v1",
+      ])
         localStorage.removeItem(key);
       location.reload();
     });

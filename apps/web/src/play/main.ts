@@ -61,7 +61,7 @@ root.innerHTML = `
       <div class="race-speed"><strong id="speed">80</strong> <small>km/h</small></div></div>
     <small id="race-link" class="race-message race-link" hidden></small>
     <p class="race-message" id="message"></p>
-    <output id="run-hud"></output>
+    <output id="run-hud"></output><small id="ghost-hud" class="race-message" hidden>Fantasma local</small>
     <button type="button" id="finish-practice" hidden>Terminar práctica</button>
   </section>
   <section class="race-overlay race-controls" id="overlay" aria-labelledby="overlay-title" hidden>
@@ -151,6 +151,7 @@ const clock = new FixedClock(createRace(), (state) => {
   if ("assist" in input && input.assist) assisted = true;
   const next = stepRace(state, input);
   sound.update(next, input);
+  runMenu.track(next);
   const event = next.events.find(({ type }) => type === "impact") ?? next.events.at(-1);
   if (source === "mobile" && channel.epoch !== undefined && !resumeUntil) {
     const kind =
@@ -188,6 +189,7 @@ let lastHud = -Infinity;
 
 function updateHud() {
   const state = clock.current;
+  element("ghost-hud").hidden = state.phase !== "racing" || !runMenu.ghost(state.tick);
   const remaining = Math.max(0, Math.ceil((state.run.limit - state.tick) / TICK_HZ));
   element("run-hud").textContent =
     `${modeNames[state.run.mode]} · ${biomeNames[biomeAt(state.driver.s, runMenu.biome())]}${Number.isFinite(remaining) ? ` · ${remaining} s` : ""} · Combo ×${state.combo}`;
@@ -407,6 +409,7 @@ async function mount() {
       environment: runMenu.biome(),
       paint: runMenu.paint,
       comfort: () => presentation.settings,
+      ghost: runMenu.ghost,
       progress(completed, label) {
         if (loading !== attempt) return;
         progress.value = completed;
