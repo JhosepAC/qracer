@@ -1,3 +1,5 @@
+import { queueGhost } from "./ghost-index.ts";
+import { readGhost, type Ghost, type GhostPlayback } from "./ghost.ts";
 import {
   addResult,
   DataFault,
@@ -59,11 +61,12 @@ export class ProgressStore {
   protected transaction<T>(
     write: boolean,
     apply: (tx: IDBTransaction, raw: unknown) => T,
+    extraStores: string[] = [],
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const db = this.db;
       if (!db) return reject(new Error("No database"));
-      const stores = write ? ["state", "ghosts", "quarantine"] : ["state"];
+      const stores = write ? ["state", "ghosts", "quarantine"] : ["state", ...extraStores];
       const tx = db.transaction(stores, write ? "readwrite" : "readonly");
       let output: T;
       let failure: unknown;
@@ -154,6 +157,7 @@ export class ProgressStore {
           }
           tx.objectStore("state").put(validated, "profile");
           tx.objectStore("ghosts").clear();
+          tx.objectStore("state").delete("ghost-index");
           tx.objectStore("quarantine").clear();
         });
       this.data = validated;
@@ -195,13 +199,46 @@ export class ProgressStore {
       await this.load();
     });
   }
-  commit(row: Summary): Promise<SaveData> {
+  ghost(category: string): Promise<GhostPlayback | undefined> {
+    return this.serial(async () => {
+      if (!this.db || this.locked) return;
+      let playback: GhostPlayback | undefined;
+      try {
+        await this.transaction(
+          false,
+          (tx, raw) => {
+            const profile = readData(raw);
+            const req = tx.objectStore("ghosts").get(category);
+            req.onsuccess = () => {
+              const value = req.result;
+              if (value?.score === profile.progress.records[category])
+                playback = readGhost(value, category);
+            };
+          },
+          ["ghosts"],
+        );
+      } catch {
+        return;
+      }
+      return playback;
+    });
+  }
+  commit(row: Summary, ghost?: Ghost): Promise<SaveData> {
     return this.serial(async () => {
       const memory = addResult(this.data, row);
       if (this.db && !this.locked) {
-        const write = () =>
+        const write = (includeGhost = true) =>
           this.transaction(true, (tx, raw) => {
-            const next = addResult(readData(raw), row);
+            const before = readData(raw);
+            const next = addResult(before, row);
+            if (includeGhost && next !== before)
+              queueGhost(
+                tx,
+                row,
+                ghost,
+                row.mode !== "practice" &&
+                  row.score > (before.progress.records[row.category] ?? -1),
+              );
             tx.objectStore("state").put(next, "profile");
             return next;
           });
@@ -213,8 +250,9 @@ export class ProgressStore {
             try {
               await this.transaction(true, (tx) => {
                 tx.objectStore("ghosts").clear();
+                tx.objectStore("state").delete("ghost-index");
               });
-              this.data = await write();
+              this.data = await write(false);
               this.status = "saved";
               this.notify();
               return this.data;
