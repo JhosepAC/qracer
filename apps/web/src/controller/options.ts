@@ -68,6 +68,7 @@ export function mountOptions(
   channel: DriveChannel,
   clearTouch: () => void,
   inputLost: () => void,
+  performanceDiagnostic: () => unknown = () => ({}),
 ) {
   function field<T extends HTMLElement>(id: string): T {
     const node = shell.querySelector<T>(`#${id}`);
@@ -224,7 +225,10 @@ export function mountOptions(
   field("drive-diagnostic").onclick = () => {
     const estimate = channel.sync.estimate(performance.now());
     const data = {
-      experiment: "F07",
+      experiment: "F11-controller",
+      schemaVersion: 1,
+      performance: performanceDiagnostic(),
+      rttMsHistogram: channel.rtt.summary(),
       transport: transportDiagnostic(),
       connected: linked,
       secureContext: isSecureContext,
@@ -279,6 +283,7 @@ export function mountOptions(
       }
       void wake();
     },
+    sampleAt: () => tilt.sampleAt,
     steer(now: number) {
       const active = tilt.active;
       const value = tilt.value(now);

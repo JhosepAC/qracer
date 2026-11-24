@@ -6,6 +6,7 @@ import {
   neutral,
   PAUSE_MS,
 } from "@qracer/session-core/wire";
+import { LatencyHistogram } from "./timing.ts";
 
 type Probe = Extract<DriveFrame, { type: "SYNC_REPLY" }>;
 type Snapshot = Extract<DriveFrame, { type: "INPUT" }>;
@@ -33,13 +34,18 @@ export class ClockSync {
     const offset = (frame.t1 - frame.t0 + (frame.t2 - now)) / 2;
     this.samples.push({ rtt, offset, at: now });
     if (this.samples.length > 8) this.samples.shift();
+    return rtt;
   }
 
   estimate(now: number) {
-    const live = this.samples.filter((sample) => now - sample.at <= SAMPLE_TTL);
-    if (live.length < 3) return;
-    let best = live[0];
-    for (const sample of live) if (best && sample.rtt < best.rtt) best = sample;
+    let live = 0;
+    let best: (typeof this.samples)[number] | undefined;
+    for (const sample of this.samples) {
+      if (now - sample.at > SAMPLE_TTL) continue;
+      live++;
+      if (!best || sample.rtt < best.rtt) best = sample;
+    }
+    if (live < 3) return;
     if (best) return { ...best, uncertainty: best.rtt / 2 + 1 };
   }
 
@@ -56,6 +62,7 @@ export class ClockSync {
 export class DriveChannel {
   epoch: number | undefined;
   sync = new ClockSync();
+  readonly rtt = new LatencyHistogram();
   private send: Transmission | undefined;
   private nextProbe = 0;
   private nextSample = 0;
@@ -63,6 +70,7 @@ export class DriveChannel {
   configure(epoch: number | undefined, send?: Transmission) {
     if (this.epoch !== epoch) {
       this.sync = new ClockSync();
+      this.rtt.reset();
       this.nextProbe = 0;
       this.nextSample = 0;
     }
@@ -91,7 +99,7 @@ export class DriveChannel {
       return false;
     }
     if (frame.type === "SYNC_REPLY") {
-      this.sync.answer(frame, now);
+      this.rtt.add(this.sync.answer(frame, now) ?? NaN);
       return false;
     }
     return true;
@@ -99,8 +107,16 @@ export class DriveChannel {
 
   sample(now: number) {
     if (now + 0.001 < this.nextSample) return false;
-    this.nextSample = now + 1000 / INPUT_HZ;
+    const interval = 1000 / INPUT_HZ;
+    this.nextSample =
+      this.nextSample === 0 || now - this.nextSample >= interval
+        ? now + interval
+        : this.nextSample + interval;
     return true;
+  }
+
+  sampleDelay(now: number) {
+    return Math.max(1, Math.ceil(this.nextSample - now));
   }
 }
 

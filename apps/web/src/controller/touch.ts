@@ -13,11 +13,13 @@ export class TouchInput {
 
   turn(id: number, steer: number) {
     const pointer = this.palms.get(id);
-    if (pointer?.control === "wheel") pointer.steer = steer;
+    if (pointer?.control !== "wheel" || pointer.steer === steer) return false;
+    pointer.steer = steer;
+    return true;
   }
 
   up(id: number) {
-    this.palms.delete(id);
+    return this.palms.delete(id);
   }
 
   clear() {

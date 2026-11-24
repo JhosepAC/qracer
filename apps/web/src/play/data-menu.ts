@@ -5,7 +5,7 @@ import { exportProgress, parseProgress } from "../storage/transfer.ts";
 import { confirmAction } from "../ui/confirm.ts";
 import { modeNames } from "./run-menu.ts";
 
-export function mountDataMenu(onOpen: () => void) {
+export function mountDataMenu(onOpen: () => void, diagnostics: () => unknown = () => ({})) {
   const trigger = document.createElement("button");
   trigger.type = "button";
   trigger.className = "button";
@@ -17,6 +17,7 @@ export function mountDataMenu(onOpen: () => void) {
   dialog.innerHTML = `<form method="dialog"><h2 id="data-title">Datos locales</h2>
     <p>Los datos pertenecen a este navegador. El modo privado o borrar sus datos puede eliminarlos. Exporta una copia para conservarlos.</p>
     <p id="data-status" role="status"></p><p id="data-counts"></p>
+    <button type="button" id="data-performance">Guardar diagnóstico de rendimiento</button>
     <button type="button" id="data-export">Exportar progreso</button>
     <label>Importar progreso (JSON, máximo 1 MiB)<input type="file" id="data-import" accept=".json,application/json"></label>
     <button type="button" id="data-recovery">Exportar copia de recuperación</button>
@@ -96,6 +97,12 @@ export function mountDataMenu(onOpen: () => void) {
       if (dialog.open && previous instanceof HTMLElement) previous.focus();
     }
   }
+  field("data-performance").onclick = () => {
+    void run(() => {
+      download(JSON.stringify(diagnostics(), null, 2), "qracer-rendimiento.json");
+      status.textContent = "Diagnóstico descargado sin entradas ni credenciales.";
+    });
+  };
   field("data-export").onclick = () => {
     void run(() => {
       download(exportProgress(progressStore.data), "qracer-progress.json");

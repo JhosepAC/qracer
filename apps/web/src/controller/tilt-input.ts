@@ -127,6 +127,10 @@ export class TiltInput {
     this.center();
   }
 
+  get sampleAt() {
+    return this.active ? this.lastSample : -Infinity;
+  }
+
   value(now: number) {
     if (!this.active) return 0;
     if (now - this.lastSample > 1000) {

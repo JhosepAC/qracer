@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { chromium, expect, test } from "@playwright/test";
 
 test("drives with two fingers, falls back from denied tilt and pauses on stale input", async ({
@@ -154,6 +155,28 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await expect
       .poll(async () => Number(await page.locator("#speed").textContent()), { timeout: 15000 })
       .toBeGreaterThan(100);
+    // A burst of wheel events must reuse one layout measurement, then release safely.
+    await phone.evaluate(() => {
+      const wheel = document.querySelector("[data-drive=wheel]");
+      if (!wheel) throw new Error("Missing wheel");
+      wheel.dispatchEvent(
+        new PointerEvent("pointerdown", { pointerId: 9, button: 0, clientX: 180 }),
+      );
+      for (let i = 0; i < 100; i++)
+        wheel.dispatchEvent(new PointerEvent("pointermove", { pointerId: 9, clientX: 100 + i }));
+      wheel.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 9 }));
+    });
+    await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
+    const mobileDownload = phone.waitForEvent("download");
+    await phone.locator("#drive-diagnostic").click();
+    const mobilePath = await (await mobileDownload).path();
+    if (!mobilePath) throw new Error("Missing mobile download");
+    const diagnostic = JSON.parse(await readFile(mobilePath, "utf8"));
+    expect(diagnostic.performance.wheelLayoutReads).toBe(1);
+    expect(diagnostic.performance.eventToSnapshotMs.samples).toBeGreaterThan(0);
+    expect(diagnostic.rttMsHistogram.samples).toBeGreaterThan(0);
+    expect(JSON.stringify(diagnostic)).not.toMatch(/token|sdp|candidate|gamma|beta/);
+    await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
     await phone.screenshot({ path: file("mobile-drive.png") });
 
     dropInput = true;
@@ -186,6 +209,19 @@ test("drives with two fingers, falls back from denied tilt and pauses on stale i
     await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
     await page.getByRole("button", { name: "Usar teclado" }).click();
     await expect(page.locator("#app")).toHaveAttribute("data-control", "keyboard");
+    await page.locator("#return-menu").click();
+    await page.getByRole("button", { name: "Datos locales", exact: true }).click();
+    const pcDownload = page.waitForEvent("download");
+    await page.locator("#data-performance").click();
+    const pcPath = await (await pcDownload).path();
+    if (!pcPath) throw new Error("Missing PC download");
+    const pc = JSON.parse(await readFile(pcPath, "utf8"));
+    expect(pc.pipeline.receiptToSimulationMs.samples).toBeGreaterThan(0);
+    expect(pc.pipeline.receiptToSubmissionMs.samples).toBeGreaterThan(0);
+    expect(pc.pipeline.clock).toBe("PC performance.now");
+    expect(pc.pipeline.meaning).toContain("not input-to-display");
+    expect(pc.rttMs.samples).toBeGreaterThan(0);
+    expect(JSON.stringify(pc)).not.toMatch(/token|sdp|candidate|gamma|beta/);
   } finally {
     await handset.close();
   }
