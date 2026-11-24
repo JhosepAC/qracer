@@ -1,3 +1,4 @@
+import { GhostRecorder } from "../../apps/web/src/storage/ghost.ts";
 import { build } from "vite";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -194,4 +195,102 @@ test("keeps a run functional when access to IndexedDB is denied", async ({ page 
   expect(await page.evaluate(() => window.f10.status)).toBe("memory");
   await page.evaluate((row) => window.f10.commit(row), row("denied"));
   expect(await page.evaluate(() => window.f10.data.progress.distance)).toBe(1000);
+});
+
+test("retains ten category best ghosts atomically and isolates damaged optional replays", async ({
+  page,
+}) => {
+  await seed(page, freshData());
+  await boot(page);
+  const fixture = (seedValue: number, score: number, id: string, meters = 4) => {
+    const start = createRace(seedValue, undefined, { mode: "time-trial" });
+    const finish = {
+      ...start,
+      phase: "finished" as const,
+      tick: 3,
+      score,
+      driver: { ...start.driver, s: meters },
+    };
+    const result = summarize(id, finish);
+    const recorder = new GhostRecorder(7200);
+    recorder.capture({ ...start, phase: "racing" });
+    const ghost = recorder.finish(finish, result.ended);
+    if (!ghost) throw new Error("Missing ghost fixture");
+    const { buffer, ...meta } = ghost;
+    return { row: result, meta, bytes: Array.from(new Uint8Array(buffer)) };
+  };
+  const fixtures = Array.from({ length: 12 }, (_, i) => fixture(i, 1000 + i, `g-${i}`));
+  const latest = fixtures[11];
+  if (!latest) throw new Error("Missing final fixture");
+  latest.row.ended = 0;
+  latest.meta.ended = 0;
+  await page.evaluate(async (rows) => {
+    for (const { row, meta, bytes } of rows)
+      await window.f10.commit(row, { ...meta, buffer: new Uint8Array(bytes).buffer });
+  }, fixtures);
+  expect(
+    await page.evaluate(
+      async (category) => (await window.f10.ghost(category))?.at(3)?.s,
+      fixtures[0]?.row.category ?? "",
+    ),
+  ).toBeUndefined();
+  for (const next of [fixture(11, 1, "worse", 99), fixture(11, 99999, "g-11", 100)]) {
+    await page.evaluate(
+      ({ row, meta, bytes }) =>
+        window.f10.commit(row, { ...meta, buffer: new Uint8Array(bytes).buffer }),
+      next,
+    );
+    expect(
+      await page.evaluate(
+        async (category) => (await window.f10.ghost(category))?.at(3)?.s,
+        latest.row.category,
+      ),
+    ).toBe(4);
+  }
+  expect(
+    await page.evaluate(
+      () =>
+        new Promise<number>((done) => {
+          const req = indexedDB.open("qracer.progress");
+          req.onsuccess = () => {
+            const db = req.result;
+            const tx = db.transaction("ghosts");
+            const count = tx.objectStore("ghosts").count();
+            count.onsuccess = () => done(count.result);
+            tx.oncomplete = () => db.close();
+          };
+        }),
+    ),
+  ).toBe(10);
+  await page.evaluate(
+    (category) =>
+      new Promise<void>((done) => {
+        const req = indexedDB.open("qracer.progress");
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("ghosts", "readwrite");
+          tx.objectStore("ghosts").put(
+            { schemaVersion: 1, category, score: 1011, ended: 0, buffer: new ArrayBuffer(4) },
+            category,
+          );
+          tx.oncomplete = () => {
+            db.close();
+            done();
+          };
+        };
+      }),
+    latest.row.category,
+  );
+  expect(
+    await page.evaluate(
+      async (category) => (await window.f10.ghost(category))?.at(3),
+      latest.row.category,
+    ),
+  ).toBeUndefined();
+  expect(
+    await page.evaluate(
+      (category) => window.f10.data.progress.records[category],
+      latest.row.category,
+    ),
+  ).toBe(1011);
 });
