@@ -101,3 +101,58 @@ test("confirms replacement/deletion, rejects unsafe files and preserves data acr
     ),
   ).toEqual({ side: "left" });
 });
+
+test("offers a recovery download for future data and refuses current-format replacement", async ({
+  page,
+}) => {
+  await page.goto("/controller/");
+  const future = { schemaVersion: 3, payload: "<img src=x onerror=alert(1)>" };
+  await page.evaluate(
+    (value) =>
+      new Promise<void>((done) => {
+        const req = indexedDB.open("qracer.progress", 3);
+        req.onupgradeneeded = () => {
+          for (const name of ["state", "ghosts", "quarantine"]) req.result.createObjectStore(name);
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("state", "readwrite");
+          tx.objectStore("state").put(value, "profile");
+          tx.oncomplete = () => {
+            db.close();
+            done();
+          };
+        };
+      }),
+    future,
+  );
+  await page.route("**/assets/race-view-*.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `export async function createRaceView(container){const canvas=document.createElement("canvas");container.append(canvas);return {canvas,draw(){},stats:()=>({}),dispose(){canvas.remove()}};}`,
+    }),
+  );
+  await page.goto("/play/");
+  await expect(page.locator("#app")).toHaveAttribute("data-storage", "future");
+  await page.getByRole("button", { name: "Datos locales", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Datos locales", exact: true });
+  const downloadEvent = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Exportar copia de recuperación" }).click();
+  const path = await (await downloadEvent).path();
+  if (!path) throw new Error("Missing recovery");
+  expect(JSON.parse(await readFile(path, "utf8")).data).toEqual(future);
+  await dialog
+    .locator("#data-import")
+    .setInputFiles({
+      name: "current.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(exportProgress(freshData())),
+    });
+  await page
+    .getByRole("dialog", { name: "Reemplazar progreso", exact: true })
+    .getByRole("button", { name: "Confirmar" })
+    .click();
+  await expect(dialog.locator("#data-status")).toContainText("versión más reciente");
+  await expect(page.locator("#app")).toHaveAttribute("data-storage", "future");
+  await expect(page.locator("img[src=x]")).toHaveCount(0);
+});

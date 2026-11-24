@@ -287,6 +287,19 @@ footer {
   width: 100%;
   min-width: 0;
 }
+.data-dialog input[type="file"]::file-selector-button {
+  min-height: 48px;
+  margin-inline-end: 0.5rem;
+  border: 1px solid #819699;
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: #1b292e;
+  color: #f3f6f3;
+  font: inherit;
+}
+.data-dialog p {
+  margin-block: 0.35rem;
+}
 .data-dialog label:has(input[type="file"]) {
   display: grid;
 }

@@ -47,6 +47,14 @@ export function mountDataMenu(onOpen: () => void) {
   }
   function refresh() {
     const data = progressStore.data;
+    void progressStore
+      .recovery()
+      .then((backup) => {
+        field("data-recovery").hidden = backup === undefined;
+      })
+      .catch(() => {
+        field("data-recovery").hidden = true;
+      });
     field("data-counts").textContent =
       `${data.progress.distance} m · Récords: ${Object.keys(data.progress.records).length} · Partidas: ${data.history.length}`;
     field("data-records").replaceChildren();
