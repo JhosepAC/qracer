@@ -25,6 +25,7 @@ export type DriveFrame = { epoch: number } & (
   | { type: "SYNC"; id: number; t0: number }
   | { type: "SYNC_REPLY"; id: number; t0: number; t1: number; t2: number }
   | { type: "DRIVE_PAUSE"; seq: number }
+  | { type: "PAUSE_ACK"; seq: number }
   | { type: "DRIVE_STATE"; mode: DriveMode; speed: number; integrity: number; nitro: number }
   | { type: "FEEDBACK"; id: number; captured: number; kind: "impact" | "boost" | "near" }
 );
@@ -69,7 +70,7 @@ export function parseDriveFrame(data: Record<string, unknown>): DriveFrame | und
     num(data.t2, data.t1)
   ) {
     return { type, epoch, id, t0, t1: data.t1, t2: data.t2 };
-  } else if (type === "DRIVE_PAUSE" && counter(data.seq)) {
+  } else if ((type === "DRIVE_PAUSE" || type === "PAUSE_ACK") && counter(data.seq)) {
     return { type, epoch, seq: data.seq };
   } else if (
     type === "DRIVE_STATE" &&

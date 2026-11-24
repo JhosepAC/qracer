@@ -1,3 +1,4 @@
+import { transportLabel } from "../session/diagnostic.ts";
 import { createRace, FixedClock, neutralInput, stepRace, TICK_HZ } from "@qracer/game-core";
 import type { DriveFrame, DriveMode } from "@qracer/session-core/wire";
 import { DriveChannel, RemoteInput } from "../session/drive-channel.ts";
@@ -308,7 +309,9 @@ function refreshMobile(now: number) {
   startMobile.hidden = driveLink.hidden = !linked;
   startMobile.disabled = !view || contextLost || !ready;
   const estimate = channel.sync.estimate(now);
-  const latency = estimate ? `RTT ${Math.round(estimate.rtt)} ms` : "Sincronizando";
+  const latency = estimate
+    ? `${transportLabel()} · RTT ${Math.round(estimate.rtt)} ms`
+    : `${transportLabel()} · Sincronizando`;
   const summary = ready ? `Mando listo · ${latency}` : `Suelta los controles · ${latency}`;
   if (driveLink.textContent !== summary) driveLink.textContent = summary;
   if (raceLink.textContent !== latency) raceLink.textContent = latency;

@@ -95,6 +95,23 @@ En loopback la PC permite probar el enlace en otro navegador local. Para
 mostrar un QR que el teléfono pueda abrir, entra en la PC por su IP LAN.
 La invitación es de un solo uso. Caduca como máximo a los dos minutos.
 
+## Transporte directo y recuperación
+
+Tras vincular, QRacer prueba WebRTC durante cinco segundos sin servidores
+STUN/TURN. Si hay una ruta saludable, las entradas pasan por un canal sin
+retransmisiones y las acciones por otro confiable. La sesión conserva su
+WebSocket autenticado. El mando y la PC indican **Directo RTC** o **Relay**.
+
+Si falla RTC, la carrera pausa y recupera el relay. Suelta los controles y
+pulsa **Continuar** en la PC para iniciar la cuenta atrás. Un cambio de red
+puede requerir reconexión; no reanuda la carrera automáticamente. En
+**Ajustes y diagnóstico → Guardar diagnóstico** puedes exportar RTT,
+contadores por transporte y recuperaciones, sin credenciales ni señalización.
+
+PC, mando y relay requieren la misma versión de protocolo (**3**).
+La ruta LAN HTTP sigue limitada a una red de confianza; los sensores
+requieren HTTPS confiable.
+
 ## Worker y Durable Objects
 
 ```sh

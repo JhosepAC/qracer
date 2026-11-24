@@ -2,5 +2,5 @@
 export const featureFlags = Object.freeze({
   pairing: { enabled: true, owner: "session", reviewIn: "F04" },
   orientation: { enabled: true, owner: "controller", reviewIn: "F05" },
-  webRtc: { enabled: false, owner: "transport", reviewIn: "F07" },
+  webRtc: { enabled: true, owner: "transport", reviewIn: "F07" },
 });

@@ -1,6 +1,13 @@
+import { writeFile } from "node:fs/promises";
 import { chromium, expect, test } from "@playwright/test";
 
-for (const scenario of ["direct", "ice-failed", "unsupported"] as const) {
+for (const scenario of [
+  "direct",
+  "ice-failed",
+  "unsupported",
+  "wss-reconnect",
+  "rtc-revoke",
+] as const) {
   test(`recovers safely with ${scenario} transport`, async ({ page }, info) => {
     test.setTimeout(60000);
     await page.route("**/assets/race-view-*.js", (route) =>
@@ -16,7 +23,19 @@ for (const scenario of ["direct", "ice-failed", "unsupported"] as const) {
     const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
     for (const tab of [page, phone])
       await tab.addInitScript((mode) => {
-        if (mode === "unsupported") {
+        if (mode === "wss-reconnect") {
+          const Native = window.WebSocket;
+          const sockets: WebSocket[] = [];
+          Object.assign(window, { qracerTestSockets: sockets });
+          window.WebSocket = new Proxy(Native, {
+            construct(target, args) {
+              const ws = new target(args[0]);
+              sockets.push(ws);
+              return ws;
+            },
+          });
+        }
+        if (mode === "unsupported" || mode === "wss-reconnect") {
           delete (window as unknown as Record<string, unknown>).RTCPeerConnection;
           return;
         }
@@ -54,17 +73,46 @@ for (const scenario of ["direct", "ice-failed", "unsupported"] as const) {
       await phone.goto(await page.locator("#host-link").inputValue());
       await page.getByRole("button", { name: "Aprobar mando" }).click();
       await page.getByRole("button", { name: "Cerrar panel" }).click();
-      if (scenario === "direct") {
+      let directMeasurement: unknown;
+      if (scenario === "direct" || scenario === "rtc-revoke") {
         await expect.poll(() => route(page)).toBe("rtc");
         await expect.poll(() => route(phone)).toBe("rtc");
         await expect(phone.locator("#app")).toHaveAttribute("data-epoch", "2");
         const before = wssInputs;
         await expect.poll(async () => (await metrics(phone)).rtcDrive).toBeGreaterThan(15);
         expect(wssInputs - before).toBeLessThanOrEqual(1);
+        const start = performance.now();
+        const inputs = wssInputs;
+        const from = await metrics(phone);
+        await page.waitForTimeout(5000);
+        directMeasurement = {
+          durationMs: performance.now() - start,
+          wssInputs: wssInputs - inputs,
+          from,
+          to: await metrics(phone),
+        };
+        expect(wssInputs - inputs).toBe(0);
       } else {
         await page.waitForTimeout(5500);
         expect(await route(page)).toBe("wss");
         expect(wssInputs).toBeGreaterThan(60);
+      }
+      if (scenario === "rtc-revoke") {
+        await page.locator("#host-pair").click();
+        await page.getByRole("button", { name: "Revocar mando" }).click();
+        await expect(phone.locator("#pair-status")).toContainText("revocó");
+        await page.getByRole("button", { name: "Cerrar panel" }).click();
+        await expect(page.getByRole("button", { name: "Jugar con móvil" })).toBeHidden();
+        const report = info.outputPath("transport-metrics.json");
+        await writeFile(
+          report,
+          JSON.stringify(
+            { scenario, directMeasurement, host: await metrics(page), phone: await metrics(phone) },
+            null,
+            2,
+          ),
+        );
+        return;
       }
       const start = page.getByRole("button", { name: "Jugar con móvil" });
       await expect(start).toBeEnabled({ timeout: 15000 });
@@ -75,6 +123,21 @@ for (const scenario of ["direct", "ice-failed", "unsupported"] as const) {
       await expect
         .poll(async () => Number(await page.locator("#speed").textContent()))
         .toBeGreaterThan(100);
+      if (scenario === "wss-reconnect") {
+        await phone.context().setOffline(true);
+        await phone.evaluate(() => {
+          for (const ws of (window as unknown as { qracerTestSockets: WebSocket[] })
+            .qracerTestSockets)
+            ws.close();
+        });
+        await expect(page.getByRole("heading", { name: "Carrera en pausa" })).toBeVisible();
+        await phone.context().setOffline(false);
+        await expect(phone.locator("#app")).toHaveAttribute("data-epoch", "2");
+        await expect(accel).not.toHaveAttribute("data-held", "");
+        await expect(page.getByRole("button", { name: "Continuar" })).toBeEnabled({
+          timeout: 15000,
+        });
+      }
       if (scenario === "direct") {
         await phone.evaluate(() => {
           const peers = (window as unknown as { qracerTestPeers: RTCPeerConnection[] })
@@ -94,14 +157,22 @@ for (const scenario of ["direct", "ice-failed", "unsupported"] as const) {
         await expect(phone.locator("#drive-state")).toContainText("Cuenta atrás");
         await expect(phone.locator("#drive-state")).toContainText("En carrera", { timeout: 15000 });
       }
-      await info.attach("transport-metrics", {
-        body: JSON.stringify(
-          { scenario, host: await metrics(page), phone: await metrics(phone), wssInputs },
+      const report = info.outputPath("transport-metrics.json");
+      await writeFile(
+        report,
+        JSON.stringify(
+          {
+            scenario,
+            directMeasurement,
+            host: await metrics(page),
+            phone: await metrics(phone),
+            wssInputs,
+          },
           null,
           2,
         ),
-        contentType: "application/json",
-      });
+      );
+      await info.attach("transport-metrics", { path: report, contentType: "application/json" });
     } finally {
       await browser.close();
     }
