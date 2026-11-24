@@ -46,6 +46,10 @@ export class ProgressStore {
   data = freshData();
   status: StorageStatus = "memory";
   backup: unknown;
+  freeOptional: (() => Promise<void>) | undefined;
+  flush() {
+    return this.queue;
+  }
   protected db: IDBDatabase | undefined;
   protected locked = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -248,6 +252,7 @@ export class ProgressStore {
         } catch (error) {
           if (error instanceof DOMException && error.name === "QuotaExceededError") {
             try {
+              await this.freeOptional?.().catch(() => undefined);
               await this.transaction(true, (tx) => {
                 tx.objectStore("ghosts").clear();
                 tx.objectStore("state").delete("ghost-index");
