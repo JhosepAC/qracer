@@ -524,7 +524,14 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Escape") {
     event.preventDefault();
     if (!event.repeat) stop();
-  } else if (source === "keyboard" && isDrivingKey(event.code, presentation.settings.bindings)) {
+  } else if (
+    source === "keyboard" &&
+    !(
+      event.target instanceof Element &&
+      event.target.closest("input, select, textarea, [contenteditable=true]")
+    ) &&
+    isDrivingKey(event.code, presentation.settings.bindings)
+  ) {
     event.preventDefault();
     keys.add(event.code);
   }

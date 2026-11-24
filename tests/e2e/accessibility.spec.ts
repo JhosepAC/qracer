@@ -57,7 +57,7 @@ test("keeps menus operable by keyboard with large text, clear focus and readable
   await page.keyboard.press("Escape");
   await expect(settings).toBeFocused();
   await page.evaluate(() => (document.documentElement.style.fontSize = "100%"));
-  const contrast = await page.locator("#host-pair, #start").evaluateAll((nodes) => {
+  const contrast = await page.locator("#host-pair, #start, .locale-picker").evaluateAll((nodes) => {
     const light = (css: string) => {
       const rgb =
         css
