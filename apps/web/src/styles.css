@@ -46,6 +46,42 @@ a {
   outline: 3px solid #67e8db;
   outline-offset: 5px;
 }
+button {
+  min-width: 48px;
+  min-height: 48px;
+  border: 1px solid #819699;
+  border-radius: 4px;
+  padding: 0.6rem 1rem;
+  color: #f3f6f3;
+  background: #1b292e;
+  font: inherit;
+}
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+summary {
+  min-height: 48px;
+  padding-block: 0.75rem;
+}
+a.brand,
+a.text-link,
+.race-controls a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  min-width: 48px;
+}
+input,
+select {
+  font: inherit;
+}
+label,
+summary,
+button,
+:where(.presentation-dialog p) {
+  overflow-wrap: anywhere;
+}
 .topbar {
   display: flex;
   align-items: center;

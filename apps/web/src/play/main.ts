@@ -534,7 +534,10 @@ window.addEventListener("blur", () => {
   if (!clock.paused || resumeUntil) stop();
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && (!clock.paused || resumeUntil)) stop();
+  if (document.hidden) {
+    sound.setActive(false);
+    if (!clock.paused || resumeUntil) stop();
+  }
 });
 window.addEventListener("pagehide", () => {
   sound.setActive(false);
