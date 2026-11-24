@@ -7,7 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 2,
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure" },
+  use: { serviceWorkers: "block", baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure" },
   projects: [
     { name: "chromium", use: { browserName: "chromium", viewport: { width: 1280, height: 800 } } },
   ],
