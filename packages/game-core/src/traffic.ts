@@ -1,8 +1,8 @@
-import { difficultyAt, validateRoute } from "./reachability.ts";
+import { difficultyAt, validateRoute, REACTION_SECONDS } from "./reachability.ts";
 import { STEP_SECONDS, TICK_HZ, driving, type DrivingConfig } from "./driving.ts";
 import { laneCenters } from "./road.ts";
 
-export const GENERATOR_VERSION = 2;
+export const GENERATOR_VERSION = 3;
 export const ROW_SPACING = 160;
 export const TRAFFIC_LOOKAHEAD = 360;
 export const TRAFFIC_SPEED = 10;
@@ -85,10 +85,25 @@ export function advanceTraffic(
   practice = false,
   config: DrivingConfig = driving,
 ): Traffic {
-  const rows = world.rows;
+  let rows = world.rows;
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (!row || row.hazard || trafficPosition(row, tick) - s > 160) continue;
+    if (!row.cars.some((car) => car.targetD !== undefined && car.moveAt === undefined)) continue;
+    const updated = {
+      ...row,
+      cars: row.cars.map((car) =>
+        car.targetD !== undefined && car.moveAt === undefined
+          ? { ...car, moveAt: tick + Math.ceil(REACTION_SECONDS * TICK_HZ) }
+          : car,
+      ),
+    };
+    rows = rows.map((value, i) => (i === index ? updated : value));
+  }
   const nextSpawn = world.nextSpawn ?? 0;
   const onRoad = (row: TrafficRow) => trafficPosition(row, tick) >= s - KEEP_BEHIND;
-  if (nextSpawn > s + TRAFFIC_LOOKAHEAD && rows.every(onRoad)) return world;
+  if (nextSpawn > s + TRAFFIC_LOOKAHEAD && rows.every(onRoad))
+    return rows === world.rows ? world : { ...world, rows };
   const retained = rows.filter(onRoad);
   if (nextSpawn > s + TRAFFIC_LOOKAHEAD || retained.length >= MAX_TRAFFIC_ROWS)
     return { ...world, rows: retained };
@@ -112,10 +127,7 @@ export function advanceTraffic(
     Math.abs((free[0] ?? 0) - (free[1] ?? 0)) === 4
   ) {
     const car = cars[0];
-    if (car)
-      cars = [
-        { ...car, targetD: free.find((d) => d !== car.d) ?? car.d, moveAt: tick + 6 * TICK_HZ },
-      ];
+    if (car) cars = [{ ...car, targetD: free.find((d) => d !== car.d) ?? car.d }];
   }
   const valid = validateRoute(
     TRAFFIC_LOOKAHEAD,
