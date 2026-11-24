@@ -65,3 +65,11 @@ it("reaches the reserved corridor using actual acceleration and steering after t
         expect(Math.abs(driver.d - safe)).toBeLessThan(0.15);
       }
 });
+
+it("uses the actual balance configuration and leaves an empty fallback when steering is insufficient", () => {
+  const world = { nextRow: 1, rows: [] };
+  expect(advanceTraffic(world, 310, 0, 0).rows[0]?.cars.length).toBeGreaterThan(0);
+  expect(
+    advanceTraffic(world, 310, 0, 0, false, { ...driving, lateralSpeed: 0.01 }).rows[0]?.cars,
+  ).toEqual([]);
+});
