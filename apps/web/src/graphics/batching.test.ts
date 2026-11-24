@@ -69,3 +69,24 @@ it("keeps both production coupe LODs at authored scale and wheel height", async 
     expect(bounds.min.y).toBeGreaterThanOrEqual(-0.001);
   }
 });
+
+it("merges mixed quantized UV formats in the shipped F08 traffic without sinking wheels", async () => {
+  const bytes = await readFile(new URL("../../public/assets/world/traffic.glb", import.meta.url));
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const model = (await loader.parseAsync(new Uint8Array(bytes).buffer, "")).scene;
+  let checked = 0;
+  model.traverse((node) => {
+    if (node.userData.qracer_lod === undefined) return;
+    const bounds = new Box3().makeEmpty();
+    for (const part of materialParts(node, model)) {
+      part.geometry.computeBoundingBox();
+      if (part.geometry.boundingBox) bounds.union(part.geometry.boundingBox);
+      expect(part.geometry.getAttribute("uv").array).toBeInstanceOf(Float32Array);
+      part.geometry.dispose();
+    }
+    expect(bounds.min.y).toBeGreaterThanOrEqual(-0.001);
+    expect(bounds.max.z - bounds.min.z).toBeGreaterThan(4);
+    checked++;
+  });
+  expect(checked).toBe(4);
+});
