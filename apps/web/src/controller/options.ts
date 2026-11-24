@@ -1,3 +1,4 @@
+import { transportDiagnostic } from "../session/diagnostic.ts";
 import type { DriveFrame } from "@qracer/session-core/wire";
 import type { DriveChannel } from "../session/drive-channel.ts";
 import { TiltInput } from "./tilt-input.ts";
@@ -186,7 +187,8 @@ export function mountOptions(shell: HTMLElement, channel: DriveChannel, clearTou
   field("drive-diagnostic").onclick = () => {
     const estimate = channel.sync.estimate(performance.now());
     const data = {
-      experiment: "F05",
+      experiment: "F07",
+      transport: transportDiagnostic(),
       connected: linked,
       secureContext: isSecureContext,
       rttMs: estimate?.rtt ?? null,

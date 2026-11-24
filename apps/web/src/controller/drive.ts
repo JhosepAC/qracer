@@ -1,3 +1,4 @@
+import { transportLabel } from "../session/diagnostic.ts";
 import { type DriveFrame, type DriveMode, INPUT_HZ } from "@qracer/session-core/wire";
 import { DriveChannel } from "../session/drive-channel.ts";
 import { mountOptions, optionsMarkup, steeringMarkup } from "./options.ts";
@@ -111,7 +112,7 @@ export function mountDrive(root: HTMLElement) {
     const now = performance.now();
     const estimate = channel.sync.estimate(now);
     label.textContent = estimate
-      ? `${modeText[mode]} · RTT ${Math.round(estimate.rtt)} ms`
+      ? `${modeText[mode]} · ${transportLabel()} · RTT ${Math.round(estimate.rtt)} ms`
       : modeText[mode];
   }
 
