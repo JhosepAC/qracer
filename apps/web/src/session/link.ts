@@ -1,3 +1,10 @@
+import { DirectTransport } from "./direct.ts";
+import {
+  isTransport,
+  parseTransport,
+  type DriveFrame,
+  type Route,
+} from "@qracer/session-core/wire";
 import {
   AUTH_MS,
   INVITE_MS,
@@ -84,6 +91,7 @@ function parseServer(raw: string): ServerFrame | undefined {
         epoch,
         until,
         linked,
+        route: data.route === "rtc" ? "rtc" : "wss",
         ...(typeof request === "string" && ROOM_ID.test(request) ? { request } : {}),
         ...(typeof code === "string" && /^\d{6}$/.test(code) ? { code } : {}),
       };
@@ -110,7 +118,7 @@ function parseServer(raw: string): ServerFrame | undefined {
         return { type: "ERROR", code: data.code as ErrorCode };
       return;
     default:
-      return parseDriveFrame(data);
+      return parseTransport(data) ?? (raw.length <= 1024 ? parseDriveFrame(data) : undefined);
   }
 }
 
@@ -176,6 +184,95 @@ type Hooks = {
 
 export class SessionLink {
   private socket?: WebSocket;
+  private direct?: DirectTransport;
+  private epoch = -1;
+  private route: Route = "wss";
+  private tried = false;
+  private blockedAt?: number;
+  private heartbeat = 0;
+  private lastHeartbeat = 0;
+  private heartbeatSent = 0;
+  readonly metrics = {
+    route: "wss",
+    wssDrive: 0,
+    rtcDrive: 0,
+    recoveries: 0,
+    reconnects: 0,
+    heartbeatRtt: 0,
+  };
+
+  private publish() {
+    document.documentElement.dataset.transport = this.metrics.route;
+    document.documentElement.dataset.transportMetrics = JSON.stringify({
+      ...this.metrics,
+      direct: this.direct?.stats,
+    });
+  }
+
+  private failDirect() {
+    this.direct?.dispose();
+    if (this.route === "rtc") {
+      this.hooks.reconnecting();
+      this.metrics.recoveries++;
+      if (!this.sendRelay({ type: "FALLBACK", epoch: this.epoch })) this.socket?.close();
+    }
+    this.route = "wss";
+    this.metrics.route = "wss";
+    this.publish();
+  }
+
+  private transportState(frame: Extract<ServerFrame, { type: "STATE" }>) {
+    this.epoch = frame.epoch;
+    if (frame.phase !== "connected") {
+      this.direct?.dispose();
+      delete this.direct;
+      this.tried = false;
+      this.route = "wss";
+      this.metrics.route = "wss";
+      return;
+    }
+    this.epoch = frame.epoch;
+    this.route = frame.route ?? "wss";
+    this.metrics.route = this.route;
+    this.direct?.configure(this.epoch);
+    if (this.route === "rtc" && !this.direct?.ready) return this.failDirect();
+    if (!this.tried && "RTCPeerConnection" in window) {
+      this.tried = true;
+      this.direct = new DirectTransport(this.role === "host", {
+        signal: (kind, payload) =>
+          this.sendRelay({ type: "SIGNAL", epoch: this.epoch, kind, payload }),
+        ready: () => {
+          if (this.role === "host")
+            this.sendRelay({ type: "TRANSPORT_REQUEST", epoch: this.epoch, route: "rtc" });
+        },
+        failed: () => this.failDirect(),
+        receive: (packet) => {
+          if (this.route === "rtc" && packet.epoch === this.epoch) this.hooks.frame(packet);
+        },
+      });
+      this.direct.configure(this.epoch);
+      this.direct.start();
+    }
+    this.publish();
+  }
+
+  private control(frame: ServerFrame) {
+    if (!isTransport(frame)) return false;
+    if (frame.epoch !== this.epoch) return true;
+    if (frame.type === "SIGNAL") this.direct?.signal(frame);
+    if (frame.type === "TRANSPORT_PROPOSE") {
+      if (this.direct?.ready)
+        this.sendRelay({ type: "TRANSPORT_ACK", epoch: this.epoch, route: "rtc" });
+      else this.sendRelay({ type: "FALLBACK", epoch: this.epoch });
+    }
+    if (frame.type === "HEARTBEAT") {
+      this.lastHeartbeat = performance.now();
+      this.metrics.heartbeatRtt = Math.round(this.lastHeartbeat - this.heartbeatSent);
+      this.publish();
+    }
+    return true;
+  }
+
   private authTimer = 0;
   private retryTimer = 0;
   private until = 0;
@@ -205,6 +302,21 @@ export class SessionLink {
       return this.finish("No se pudo abrir el enlace con el relay.");
     }
     this.socket = socket;
+    this.lastHeartbeat = performance.now();
+    clearInterval(this.heartbeat);
+    this.heartbeat = window.setInterval(() => {
+      if (!this.ready) return;
+      const now = performance.now();
+      if (
+        now - this.lastHeartbeat > 7000 ||
+        (this.blockedAt !== undefined && now - this.blockedAt >= 250)
+      )
+        return socket.close();
+      if (now - this.heartbeatSent >= 2000 && this.epoch >= 0) {
+        this.heartbeatSent = now;
+        this.sendRelay({ type: "HEARTBEAT", epoch: this.epoch });
+      }
+    }, 50);
     this.authTimer = window.setTimeout(() => socket.close(), AUTH_MS + 1000);
     socket.onopen = () => {
       if (this.socket !== socket || this.closed) return;
@@ -235,11 +347,22 @@ export class SessionLink {
         this.role = "resume";
         this.key.token = frame.token;
       }
+      if (frame.type === "STATE") this.transportState(frame);
+      if (this.control(frame)) return;
+      if ("epoch" in frame && frame.type !== "STATE" && this.route === "rtc") return;
       this.hooks.frame(frame);
     };
     socket.onclose = () => {
       if (this.socket !== socket || this.closed) return;
       window.clearTimeout(this.authTimer);
+      this.direct?.dispose();
+      delete this.direct;
+      this.tried = false;
+      this.route = "wss";
+      this.metrics.route = "wss";
+      this.metrics.reconnects++;
+      clearInterval(this.heartbeat);
+      delete this.blockedAt;
       delete this.socket;
       this.ready = false;
       if (this.role === "invite")
@@ -260,14 +383,34 @@ export class SessionLink {
   }
 
   send(frame: ClientFrame): boolean {
-    if (
-      !this.ready ||
-      this.socket?.readyState !== WebSocket.OPEN ||
-      this.socket.bufferedAmount > 8192
-    )
+    if ("epoch" in frame && !isTransport(frame)) {
+      if (frame.epoch !== this.epoch) return false;
+      if (this.route === "rtc") {
+        const sent = this.direct?.send(frame as DriveFrame) ?? false;
+        if (sent) this.metrics.rtcDrive++;
+        return sent;
+      }
+      const sent = this.sendRelay(frame);
+      if (sent) this.metrics.wssDrive++;
+      return sent;
+    }
+    return this.sendRelay(frame);
+  }
+
+  private sendRelay(frame: ClientFrame): boolean {
+    if (!this.ready || this.socket?.readyState !== WebSocket.OPEN) return false;
+    if (this.socket.bufferedAmount > 8192) {
+      this.blockedAt ??= performance.now();
       return false;
-    this.socket.send(JSON.stringify(frame));
-    return true;
+    }
+    delete this.blockedAt;
+    try {
+      this.socket.send(JSON.stringify(frame));
+      return true;
+    } catch {
+      this.socket.close();
+      return false;
+    }
   }
 
   private finish(message: string) {
@@ -279,6 +422,8 @@ export class SessionLink {
     if (this.closed) return;
     if (endRoom && this.role === "host") this.send({ type: "END" });
     this.closed = true;
+    this.direct?.dispose();
+    clearInterval(this.heartbeat);
     window.clearTimeout(this.retryTimer);
     window.clearTimeout(this.authTimer);
     this.socket?.close();
