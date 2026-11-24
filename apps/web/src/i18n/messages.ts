@@ -31,7 +31,7 @@ const dynamic: readonly [RegExp, (match: RegExpMatchArray) => string][] = [
 export function translateText(source: string, locale: Locale): string {
   if (locale === "es") return source;
   const text = source.trim().replace(/\s+/g, " ");
-  let translated = messages[text];
+  let translated = Object.hasOwn(messages, text) ? messages[text] : undefined;
   if (translated === undefined && text.includes(" · "))
     translated = text
       .split(" · ")

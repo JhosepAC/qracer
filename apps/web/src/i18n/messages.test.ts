@@ -16,3 +16,8 @@ it("localizes anchored dynamic UI messages and preserves data and source spacing
   expect(translateText("<img onerror=alert(1)>", "en")).toBe("<img onerror=alert(1)>");
   expect(translateText("Integridad 2/3", "es")).toBe("Integridad 2/3");
 });
+
+it("preserves unknown text even when it names inherited object properties", () => {
+  for (const source of ["constructor", "toString", "__proto__", "hasOwnProperty"])
+    expect(translateText(source, "en")).toBe(source);
+});
