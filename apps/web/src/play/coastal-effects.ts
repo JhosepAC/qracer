@@ -75,7 +75,13 @@ export function coastalEffects(capacity: number) {
 
   return {
     mesh,
-    update(state: Race, tick: number, origin: number, reducedMotion: boolean) {
+    update(
+      state: Race,
+      tick: number,
+      origin: number,
+      reducedMotion: boolean,
+      reducedFlashes = false,
+    ) {
       if (reducedMotion || state.phase === "countdown" || state.tick < previousTick) {
         for (const particle of particles) particle.at = -Infinity;
         geometry.setDrawRange(0, 0);
@@ -84,7 +90,7 @@ export function coastalEffects(capacity: number) {
         return;
       }
       if (state.tick !== previousTick) {
-        const hit = integrity > state.driver.integrity;
+        const hit = !reducedFlashes && integrity > state.driver.integrity;
         const amount = hit ? capacity / 4 : state.driver.boosting && state.tick % 3 === 0 ? 2 : 0;
         for (let i = 0; i < amount; i++) {
           const particle = particles[cursor];

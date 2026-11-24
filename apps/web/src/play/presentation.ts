@@ -1,3 +1,4 @@
+import { mountKeyboard } from "./keyboard.ts";
 import { readPresentation, savePresentation } from "./preferences.ts";
 import type { RaceAudio } from "./audio.ts";
 import "./presentation.css";
@@ -45,6 +46,23 @@ export function mountPresentation(audio: RaceAudio, onOpen: () => void) {
       apply();
     };
   }
+  const comfort = field("comfort-options");
+  comfort.innerHTML = `<fieldset><legend>Comodidad</legend>
+    <label><input type="checkbox" id="comfort-stableCamera"> Cámara estable</label>
+    <label><input type="checkbox" id="comfort-reducedMotion"> Reducir movimiento</label>
+    <label><input type="checkbox" id="comfort-reducedFlashes"> Reducir flashes</label>
+    <label><input type="checkbox" id="comfort-assisted"> Conducción asistida con teclado</label>
+    <p class="fine-print">La asistencia reduce dirección y aceleración y separa los récords. Las preferencias del sistema pueden reducir el movimiento.</p>
+    <div id="keyboard-options"></div></fieldset>`;
+  for (const key of ["stableCamera", "reducedMotion", "reducedFlashes", "assisted"] as const) {
+    const input = field<HTMLInputElement>(`comfort-${key}`);
+    input.checked = settings[key];
+    input.onchange = () => {
+      settings[key] = input.checked;
+      apply();
+    };
+  }
+  mountKeyboard(field("keyboard-options"), settings.bindings, apply);
   muted.onchange = () => {
     settings.muted = muted.checked;
     apply();
