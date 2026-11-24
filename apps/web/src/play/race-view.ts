@@ -1,3 +1,5 @@
+import { ghostMesh } from "./ghost-view.ts";
+import type { GhostPose } from "../storage/ghost.ts";
 import { BIOMES, biomeAt, terrainTile, themes, type Biome } from "./biomes.ts";
 import { loadWorldAsset, worldAssets } from "./world-assets.ts";
 import {
@@ -58,6 +60,7 @@ const colors = [0xffcb47, 0x72cce3, 0xe47e72, 0x58af88, 0x987ed0, 0x68757e].map(
 type Batch = InstancedMesh<Mesh["geometry"], Material>[];
 export interface RaceViewOptions {
   quality?: Quality;
+  ghost?: (tick: number) => GhostPose | undefined;
   comfort?: () => { stableCamera: boolean; reducedMotion: boolean; reducedFlashes: boolean };
   environment?: Biome;
   paint?: () => number;
@@ -108,6 +111,7 @@ export async function createRaceView(
     progress,
     environment: initialBiome = "coast",
     paint: playerPaint,
+    ghost: replayGhost,
     comfort,
   }: RaceViewOptions = {},
 ) {
@@ -254,6 +258,9 @@ export async function createRaceView(
     // The GLB scene owns the original pivot at wheel height, used by all instances.
     const hero = batch(assetRoot(car, "qracer_lod", quality === "low" ? 1 : 0), 1, car);
     if (profile.shadow) for (const part of hero) part.castShadow = true;
+    const ghost = ghostMesh(car);
+    const ghostBatch = [ghost];
+    scene.add(ghost);
     const trafficModels = await loadWorldAsset("traffic", renderer, assetAbort.signal);
     roots.push(trafficModels);
     const traffic = [batch(assetRoot(car, "qracer_lod", 1), MAX_TRAFFIC, car)];
@@ -519,6 +526,17 @@ export async function createRaceView(
       );
       addPose(shadows, pose, 0.015);
       const tick = previous.tick + (current.tick - previous.tick) * alpha;
+      ghost.count = 0;
+      const replay = replayGhost?.(tick);
+      if (
+        replay &&
+        Math.abs(replay.s - distance) < profile.trafficRange &&
+        (Math.abs(replay.s - distance) > 4 || Math.abs(replay.d - lateral) > 1.9)
+      ) {
+        roadPose(replay.s, replay.d, origin, pose);
+        addPose(ghostBatch, pose, 0.035, replay.turn);
+        ghost.instanceMatrix.needsUpdate = true;
+      }
       for (const row of current.traffic.rows) {
         const s = trafficPosition(row, Math.max(tick, row.tick));
         if (s - distance > profile.trafficRange || distance - s > 18) continue;
@@ -608,6 +626,7 @@ export async function createRaceView(
       dispose,
       canvas: renderer.domElement,
       stats: () => ({
+        ghostVisible: ghost.count > 0,
         calls: renderer.info.render.calls,
         triangles: renderer.info.render.triangles,
         geometries: renderer.info.memory.geometries,
