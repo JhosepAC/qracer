@@ -1,10 +1,10 @@
-import { mountLocale } from "../i18n/locale.ts";
-import { isTransport } from "@qracer/session-core/wire";
-import { controlsMarkup, mountDrive } from "./drive.ts";
 import { PROTOCOL_VERSION } from "@qracer/protocol/version";
-import { ROOM_ID, TOKEN } from "@qracer/session-core/wire";
-import { parseInvitation, type RoomToken, SessionLink, sessionError } from "../session/link.ts";
+import { isTransport, ROOM_MS } from "@qracer/session-core/wire";
 import { featureFlags } from "../features.ts";
+import { mountLocale } from "../i18n/locale.ts";
+import { parseInvitation, type RoomToken, SessionLink, sessionError } from "../session/link.ts";
+import { parseResume } from "../session/resume.ts";
+import { controlsMarkup, mountDrive } from "./drive.ts";
 import "../styles.css";
 import "../session/pair.css";
 
@@ -45,11 +45,13 @@ const code = element<HTMLOutputElement>("pair-code");
 const storageKey = "qracer.resume.v1";
 let link: SessionLink | undefined;
 let retained: RoomToken | undefined;
+let retainedUntil = 0;
 
-function remember(key?: RoomToken) {
+function remember(key?: RoomToken, until = Date.now() + ROOM_MS) {
   retained = key;
+  retainedUntil = key ? Math.min(until, Date.now() + ROOM_MS) : 0;
   try {
-    if (key) sessionStorage.setItem(storageKey, JSON.stringify(key));
+    if (key) sessionStorage.setItem(storageKey, JSON.stringify({ ...key, until: retainedUntil }));
     else sessionStorage.removeItem(storageKey);
   } catch {
     /* The live tab can still reconnect in memory. */
@@ -57,16 +59,15 @@ function remember(key?: RoomToken) {
 }
 
 function readStored(): RoomToken | undefined {
-  if (retained) return retained;
+  if (retained && Date.now() < retainedUntil) return retained;
   try {
-    const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
-    if (
-      typeof saved?.room === "string" &&
-      typeof saved?.token === "string" &&
-      ROOM_ID.test(saved.room) &&
-      TOKEN.test(saved.token)
-    )
-      return saved;
+    const saved = parseResume(sessionStorage.getItem(storageKey));
+    if (saved) {
+      retainedUntil = saved.until;
+      retained = { room: saved.room, token: saved.token };
+      return retained;
+    }
+    remember();
   } catch {
     /* Storage is optional. */
   }
@@ -88,6 +89,7 @@ function connect(key: RoomToken, resume = false) {
         if ("epoch" in frame && !isTransport(frame)) drive.receive(frame);
         return;
       }
+      if (retained) remember(retained, frame.until);
       if (frame.phase === "connected")
         drive.configure(frame.epoch, (packet) => link?.send(packet) ?? false);
       else drive.configure();

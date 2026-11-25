@@ -249,6 +249,12 @@ export class RoomSession {
   expire(now: number): Effect[] {
     const state = this.state;
     if (state.ended) return [];
+    if (now >= this.until)
+      return this.end(
+        now >= state.leaseUntil && state.leaseUntil < state.hardUntil
+          ? "QUOTA_EXHAUSTED"
+          : "ROOM_EXPIRED",
+      );
     if (state.switching && now >= state.switching.until) {
       delete state.switching;
       state.route = "wss";
@@ -256,12 +262,6 @@ export class RoomSession {
       this.revision++;
       return this.stateEffects();
     }
-    if (now >= this.until)
-      return this.end(
-        now >= state.leaseUntil && state.leaseUntil < state.hardUntil
-          ? "QUOTA_EXHAUSTED"
-          : "ROOM_EXPIRED",
-      );
     const effects: Effect[] = [];
     let changed = false;
     if (state.invite && now >= state.invite.until) {
@@ -314,6 +314,7 @@ export class RoomSession {
       return [this.reject(id, "VERSION_MISMATCH"), ...this.remove(id, received)];
     if (isTransport(message)) {
       const expired = this.expire(received);
+      if (!this.peers.has(id)) return expired;
       return expired.concat(this.transport(peer, message, received));
     }
     if ("epoch" in message) {
