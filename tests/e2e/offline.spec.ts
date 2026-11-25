@@ -81,3 +81,32 @@ test("refuses mismatched downloads while preserving the installed shell", async 
     await server.close();
   }
 });
+
+test("keeps one offline update listener across graphics rebuilds", async ({ page }) => {
+  test.setTimeout(60000);
+  await prepareGraphics(page);
+  await page.addInitScript(() => {
+    const handlers = new Set<EventListenerOrEventListenerObject>();
+    const add = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type, handler, options) {
+      if (this instanceof ServiceWorkerRegistration && type === "updatefound" && handler) {
+        handlers.add(handler);
+        document.documentElement.dataset.updateListeners = String(handlers.size);
+      }
+      return add.call(this, type, handler, options);
+    };
+  });
+  const server = await offlineServer();
+  try {
+    await page.goto(`${server.origin}/play/`);
+    await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    for (const quality of ["balanced", "low", "balanced", "low"]) {
+      await page.locator("#graphics-quality").selectOption(quality);
+      await expect(page.locator("#start")).toBeEnabled({ timeout: 20000 });
+      await expect(page.locator("html")).toHaveAttribute("data-update-listeners", "1");
+    }
+  } finally {
+    await server.close();
+  }
+});
