@@ -52,6 +52,33 @@ async function fixture() {
   };
 }
 
+it("prioritizes absolute expiry over RTC switch recovery and rejects a valid but late resume", async () => {
+  const s = await fixture();
+  const phone = s.open();
+  await s.auth(phone, "invite", (await s.rotate()).token);
+  const token = await s.link(phone);
+  s.room.remove(phone, s.now());
+  const resumer = s.open();
+  const deadline = s.now() + 1000;
+  s.room.state.hardUntil = deadline;
+  s.room.state.switching = { until: deadline, host: false, phone: false };
+  s.jump(1001);
+  const effects = await s.auth(resumer, "resume", token);
+  expect(s.room.state.ended).toBe("ROOM_EXPIRED");
+  expect(effects.some(({ frame }) => frame.type === "RESUME")).toBe(false);
+  expect(s.room.peers.size).toBe(0);
+});
+
+it("does not echo authenticated transport frames after expiration", async () => {
+  const s = await fixture();
+  s.room.state.hardUntil = s.now() + 1000;
+  s.jump(1001);
+  const effects = await s.send(s.host, { type: "HEARTBEAT", epoch: 0 });
+  expect(effects).toEqual([
+    { id: s.host, frame: { type: "ERROR", code: "ROOM_EXPIRED" }, close: true },
+  ]);
+});
+
 it("has separate roles and one concurrent invitation claimant requiring host approval", async () => {
   const s = await fixture();
   const invite = await s.rotate();
