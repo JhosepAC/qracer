@@ -1,5 +1,3 @@
-import { seedBenchmarkGhost } from "./ghost-fixture.mjs";
-import { openLane } from "../packages/game-core/src/traffic.ts";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -8,9 +6,15 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { createRelay } from "../apps/relay-local/src/server.ts";
+import { openLane } from "../packages/game-core/src/traffic.ts";
+import { checkpoint, restartAudit } from "./benchmark-stability.mjs";
+import { seedBenchmarkGhost } from "./ghost-fixture.mjs";
 
 const { values } = parseArgs({
   options: {
+    restarts: { type: "string", default: "20" },
+    stability: { type: "boolean", default: false },
+    adaptive: { type: "boolean", default: false },
     ghost: { type: "boolean", default: false },
     locale: { type: "string", default: "es" },
     environment: { type: "string", default: "coast" },
@@ -24,7 +28,11 @@ const { values } = parseArgs({
 const profiles = values.profiles.split(",");
 const runs = Number(values.runs);
 const seconds = Number(values.seconds);
+const restarts = Number(values.restarts);
 if (
+  !Number.isInteger(restarts) ||
+  restarts < 1 ||
+  restarts > 100 ||
   !["es", "en"].includes(values.locale) ||
   !["coast", "desert", "city"].includes(values.environment) ||
   !profiles.every((profile) => ["low", "balanced", "high"].includes(profile)) ||
@@ -57,6 +65,9 @@ const report = {
   conditions: {
     seconds,
     warmup,
+    adaptive: values.adaptive,
+    stability: values.stability,
+    clocks: "native RAF/performance.now; no time scaling; GC only while paused",
     ghost: values.ghost ? "Synthetic offset comparison trajectory, native IndexedDB" : "disabled",
     cpu: cpus()[0]?.model,
     memoryGiB: totalmem() / 2 ** 30,
@@ -73,19 +84,22 @@ const report = {
 const relay = createRelay({ staticDir, allowedOrigins: [] });
 let browser;
 
-function instrument({ profile, warmup, locale }) {
+function instrument({ profile, warmup, locale, adaptive }) {
   localStorage.setItem("qracer.locale.v1", locale);
   localStorage.setItem("qracer.graphics.quality", profile);
+  localStorage.setItem("qracer.graphics.adaptive.v1", String(adaptive));
   const native = window.requestAnimationFrame.bind(window);
   const frames = [],
     work = [],
     gpu = [];
   const maxima = {};
+  const biomeFrames = {};
   const biomes = new Set();
   const resources = [];
   let ghostSamples = 0;
   let resourcesAt = -Infinity;
-  let start = Infinity;
+  let start = Infinity,
+    started = 0;
   let previous;
   let sampledAt = -Infinity;
   let gl, extension;
@@ -105,7 +119,13 @@ function instrument({ profile, warmup, locale }) {
   window.requestAnimationFrame = (callback) =>
     native((now) => {
       if (now < start) return callback(now);
-      if (previous !== undefined) frames.push(now - previous);
+      if (previous !== undefined) {
+        const interval = now - previous;
+        frames.push(interval);
+        const biome = document.querySelector("#preview").dataset.biome ?? "unknown";
+        biomeFrames[biome] ??= [];
+        biomeFrames[biome].push(interval);
+      }
       previous = now;
       const before = performance.now();
       let query;
@@ -151,11 +171,27 @@ function instrument({ profile, warmup, locale }) {
     });
   window.raceBenchmark = {
     begin() {
+      while (queries.length) gl.deleteQuery(queries.shift());
+      frames.length = work.length = gpu.length = resources.length = 0;
+      for (const key of Object.keys(maxima)) delete maxima[key];
+      biomes.clear();
+      for (const key of Object.keys(biomeFrames)) delete biomeFrames[key];
+      ghostSamples = longest = taskCount = 0;
+      resourcesAt = sampledAt = -Infinity;
+      previous = undefined;
+      disrupted = false;
       gl = document.querySelector("#preview canvas").getContext("webgl2");
       extension = gl?.getExtension("EXT_disjoint_timer_query_webgl2");
-      start = performance.now() + warmup * 1000;
+      started = performance.now();
+      start = started + warmup * 1000;
     },
     finish() {
+      const ended = performance.now();
+      start = Infinity;
+      const gpuAvailable = !!extension;
+      const pendingGpuQueries = queries.length;
+      while (queries.length) gl.deleteQuery(queries.shift());
+      gl = extension = undefined;
       const summarize = (data) => {
         const sorted = [...data].sort((a, b) => a - b);
         const percentile = (p) => sorted[Math.ceil(sorted.length * p) - 1] ?? null;
@@ -174,14 +210,20 @@ function instrument({ profile, warmup, locale }) {
           performance.getEntriesByType("navigation")[0]?.transferSize ?? 0,
         );
       return {
+        measuredMs: ended - started - warmup * 1000,
+        elapsedMs: ended - started,
         frames: summarize(frames),
         mainThreadCallback: summarize(work),
-        gpu: extension ? summarize(gpu) : null,
+        gpu: gpuAvailable ? summarize(gpu) : null,
+        pendingGpuQueriesDiscarded: pendingGpuQueries,
         gpuDisjoint: disrupted,
         longTasks: { count: taskCount, maximumMs: longest },
         renderer: maxima,
         ghostSamples,
         biomes: [...biomes],
+        framesByBiome: Object.fromEntries(
+          Object.entries(biomeFrames).map(([key, data]) => [key, summarize(data)]),
+        ),
         resources,
         transferBytes,
         distance: document.getElementById("distance").textContent,
@@ -208,20 +250,40 @@ try {
   )
     throw new Error(`Expected hardware WebGL: ${report.adapter}`);
 
+  const { port } = relay.server.address();
+  const origin = `http://127.0.0.1:${port}`;
+  let sharedPage;
+  const sharedErrors = [];
+  report.checkpoints = [];
   for (const profile of profiles) {
     for (let run = 1; run <= runs; run++) {
-      const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-      const errors = [];
-      page.on("pageerror", (error) => errors.push(error.message));
-      page.on("console", (message) => {
-        if (message.type() === "error") errors.push(message.text());
-      });
+      const page =
+        sharedPage ?? (await browser.newPage({ viewport: { width: 1920, height: 1080 } }));
+      const fresh = page !== sharedPage;
+      const errors = values.stability ? sharedErrors : [];
+      errors.length = 0;
+      if (fresh) page.on("pageerror", (error) => errors.push(error.message));
+      if (fresh)
+        page.on("console", (message) => {
+          if (message.type() === "error") errors.push(message.text());
+        });
       try {
-        await page.addInitScript(instrument, { profile, warmup, locale: values.locale });
-        const { port } = relay.server.address();
-        const origin = `http://127.0.0.1:${port}`;
-        if (values.ghost) await seedBenchmarkGhost(page, origin, seconds);
-        await page.goto(`${origin}/play/`);
+        if (fresh) {
+          await page.addInitScript(instrument, {
+            profile,
+            warmup,
+            locale: values.locale,
+            adaptive: values.adaptive,
+          });
+          if (values.ghost) await seedBenchmarkGhost(page, origin, seconds);
+          await page.goto(`${origin}/play/`);
+        } else {
+          await page.locator("#return-menu").click();
+          await page.waitForSelector('#preview[data-graphics="ready"]');
+          if ((await page.locator("#graphics-quality").inputValue()) !== profile)
+            await page.locator("#graphics-quality").selectOption(profile);
+        }
+        if (values.stability) sharedPage = page;
         await page.waitForSelector(`#preview[data-graphics="ready"][data-quality="${profile}"]`);
         if (values.environment !== "coast") {
           await page.locator("#run-biome").selectOption(values.environment);
@@ -236,22 +298,45 @@ try {
         const lane = openLane(310);
         if (lane !== 1) await page.keyboard.down(lane === 0 ? "ArrowLeft" : "ArrowRight");
         await page.evaluate(() => window.raceBenchmark.begin());
-        await page.waitForTimeout(Math.floor(seconds * 500));
+        const wait = async (ms) => {
+          while (ms > 0) {
+            const chunk = Math.min(ms, 30000);
+            await page.waitForTimeout(chunk);
+            ms -= chunk;
+            console.log(`progress ${profile}/${run}: ${new Date().toISOString()}`);
+          }
+        };
+        await wait(Math.floor(seconds * 500));
         await page.keyboard.down("Shift");
         await page.waitForTimeout(2000);
         await page.keyboard.up("Shift");
-        await page.waitForTimeout(Math.max(0, Math.ceil(seconds * 500) - 2000));
+        await wait(Math.max(0, Math.ceil(seconds * 500) - 2000));
         const result = await page.evaluate(() => window.raceBenchmark.finish());
-        report.runs.push({ profile, run, ...result, errors });
+        report.runs.push({ profile, run, ...result, errors: [...errors] });
         console.log(profile, run, result.frames, result.renderer, result.distance, errors);
         if (run === 1) await page.screenshot({ path: resolve(output, `${profile}-race.png`) });
         await save();
         if (result.mode !== "playing" || errors.length || (values.ghost && !result.ghostSamples))
           throw new Error(`Invalid run: ${profile}/${run}`);
+        await page.keyboard.up("ArrowUp");
+        await page.keyboard.up("ArrowLeft");
+        await page.keyboard.up("ArrowRight");
+        await page.keyboard.press("Escape");
+        if (values.stability) report.checkpoints.push(await checkpoint(page, `${profile}/${run}`));
+        await save();
       } finally {
-        await page.close();
+        if (!values.stability) await page.close();
       }
     }
+  }
+  if (values.stability) {
+    report.stability = await restartAudit(sharedPage, output, restarts);
+    report.stability.activeElapsedMs = report.runs.reduce((sum, run) => sum + run.elapsedMs, 0);
+    report.stability.simulatedSeconds = report.runs.reduce(
+      (sum, run) => sum + run.renderer.simulationTick / 60,
+      0,
+    );
+    await save();
   }
 } finally {
   await browser?.close();

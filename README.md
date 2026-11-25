@@ -15,6 +15,31 @@ GPU que proporcione el navegador. Para medir el coste del fantasma con una
 trayectoria sintética local: `node scripts/benchmark-race.mjs --ghost --profiles balanced --runs 1 --seconds 90`.
 Esta opción usa contrarreloj y admite hasta 110 segundos por ejecución.
 
+**Ajustar resolución para mantener fluidez** está activado por defecto. Respeta
+el perfil elegido y sus límites; baja tras cinco segundos de sobrecarga y
+recupera resolución tras veinte segundos con margen. Puedes desactivarlo en el menú.
+
+Para medir perfiles fijos y auditar una sesión con veinte reinicios y veinte
+reconstrucciones: `node scripts/benchmark-race.mjs --stability`. Son nueve recorridos
+de cinco minutos y un chequeo adicional; usa reloj nativo, GPU identificada y GC
+solo en pausa. No recompiles ni ejecutes otras pruebas gráficas durante el ensayo.
+Añade `--adaptive` para medir el ajuste automático. Los snapshots de heap y los
+informes quedan en `artifacts/race-benchmark/`. Comprueba los criterios con
+`node scripts/check-race-report.mjs`; un incumplimiento devuelve código de salida 1.
+
+`node scripts/benchmark-client.mjs` mide arranque con red limitada y procesamiento
+del mando en Chromium local; `--mode startup` o `--mode controller` los separa.
+La ruta directa inyecta orientación y un permiso concedido para probar el filtro;
+no certifica sensores físicos. `--seconds 1800 --route direct --mode controller`
+audita treinta minutos con inclinación sintética. El renderer se sustituye solo
+en este ensayo de transporte. Los resultados locales no certifican Wi-Fi ni Internet.
+
+En **Datos locales → Guardar diagnóstico de rendimiento** puedes exportar los
+gráficos y los histogramas de recepción, simulación y envío del frame. El mando
+exporta RTT y coste local desde **Ajustes y diagnóstico**. Son descargas voluntarias,
+sin credenciales ni entradas crudas; el envío del frame no mide la latencia física
+hasta la pantalla.
+
 - [Instrucciones para agentes](AGENTS.md)
 
 La planificación en `docs/` se mantiene local y está excluida del repositorio por decisión del propietario. Las reglas públicas de contribución están en [CONTRIBUTING.md](CONTRIBUTING.md).
