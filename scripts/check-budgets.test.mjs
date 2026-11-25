@@ -38,6 +38,7 @@ it("enforces the first-play total even when each asset and the whole distributio
     ".vite/manifest.json",
     "bundle-report.json",
     "app.js",
+    "decoder-worker.js",
     "play/index.html",
     "assets/coast/a.glb",
     "assets/coast/b.glb",
@@ -59,12 +60,13 @@ it("enforces the first-play total even when each asset and the whole distributio
     );
     await writeFile(join(dir, "bundle-report.json"), JSON.stringify({ "app.js": { modules: [] } }));
     await writeFile(join(dir, "app.js"), "x");
+    await writeFile(join(dir, "decoder-worker.js"), "x");
     await writeFile(join(dir, "play/index.html"), "x");
     await writeFile(join(dir, "assets/coast/a.glb"), Buffer.alloc(3 * 1024 * 1024 - 30));
     await writeFile(join(dir, "assets/coast/b.glb"), Buffer.alloc(4 * 1024 * 1024 - 10));
     await writeFile(join(dir, "assets/world/traffic.glb"), Buffer.alloc(20));
     await writeFile(join(dir, "assets/world/city.glb"), Buffer.alloc(1024 * 1024));
-    expect((await checkBudgets(dir)).firstPlayUncompressedBytes).toBe(8 * 1024 * 1024 - 18);
+    expect((await checkBudgets(dir)).firstPlayUncompressedBytes).toBe(8 * 1024 * 1024 - 17);
     await writeFile(join(dir, "assets/coast/b.glb"), Buffer.alloc(4 * 1024 * 1024 + 10));
     await expect(checkBudgets(dir)).rejects.toThrow("First playable download exceeds 8 MiB");
   } finally {

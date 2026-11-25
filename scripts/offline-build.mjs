@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
@@ -7,7 +7,12 @@ import { build } from "vite";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dist = resolve(root, "apps/web/dist");
 const chunks = JSON.parse(await readFile(resolve(dist, ".vite/manifest.json"), "utf8"));
-const selected = new Set(["/play/", "/LICENSE.txt", "/THIRD_PARTY_NOTICES.txt"]);
+const selected = new Set([
+  "/play/",
+  "/decoder-worker.js",
+  "/LICENSE.txt",
+  "/THIRD_PARTY_NOTICES.txt",
+]);
 function collect(key) {
   const chunk = chunks[key];
   if (!chunk || selected.has(`/${chunk.file}`)) return;
