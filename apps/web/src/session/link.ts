@@ -1,28 +1,26 @@
-import { featureFlags } from "../features.ts";
-import { ReliablePause } from "./reliable-pause.ts";
-import { DirectTransport } from "./direct.ts";
-import {
-  isTransport,
-  parseTransport,
-  type DriveFrame,
-  type Route,
-} from "@qracer/session-core/wire";
 import {
   AUTH_MS,
-  INVITE_MS,
   type ClientFrame,
   type Creation,
+  type DriveFrame,
   type ErrorCode,
-  parseDriveFrame,
+  INVITE_MS,
+  isTransport,
   type Phase,
+  parseDriveFrame,
+  parseTransport,
   RECONNECT_MS,
   ROOM_ID,
   type Role,
-  type ServerFrame,
+  type Route,
   SESSION_BYTES,
   SESSION_VERSION,
+  type ServerFrame,
   TOKEN,
 } from "@qracer/session-core/wire";
+import { featureFlags } from "../features.ts";
+import { DirectTransport } from "./direct.ts";
+import { ReliablePause } from "./reliable-pause.ts";
 
 const errors: Record<ErrorCode, string> = {
   AUTH_REQUIRED: "La vinculación no se autenticó a tiempo.",
@@ -450,5 +448,6 @@ export class SessionLink {
     window.clearTimeout(this.authTimer);
     this.socket?.close();
     delete this.socket;
+    this.key.token = "";
   }
 }
