@@ -1,9 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { LEASE_MS } from "@qracer/session-core/wire";
-
-const DAY_MS = 86_400_000;
-const MAX_ACTIVE = 8;
-const MAX_BLOCKS = 25;
+import { DAY_MS, MAX_ACTIVE, MAX_BLOCKS } from "./session-limits.ts";
 
 export class SessionBudget extends DurableObject {
   private tables() {
@@ -20,26 +17,43 @@ export class SessionBudget extends DurableObject {
       const sql = this.tables();
       const until = this.ctx.storage.transactionSync(() => {
         sql.exec("DELETE FROM slots WHERE until <= ?", now);
-        sql.exec("DELETE FROM usage WHERE day <> ?", day);
+        sql.exec("DELETE FROM usage WHERE day < ?", day);
         const slot = sql
           .exec<{ until: number }>("SELECT until FROM slots WHERE id = ?", id)
           .toArray()[0];
         const active = sql
           .exec<{ count: number }>("SELECT COUNT(*) AS count FROM slots")
           .one().count;
-        const blocks =
-          sql.exec<{ blocks: number }>("SELECT blocks FROM usage WHERE day = ?", day).toArray()[0]
-            ?.blocks ?? 0;
-        if (blocks >= MAX_BLOCKS || (!slot && active >= MAX_ACTIVE)) return null;
         if ((slot?.until ?? 0) !== previousUntil) return null;
         const expires = Math.max(now, previousUntil) + LEASE_MS;
+        // A block spanning UTC midnight is charged in both days, including carry-over.
+        const days = expires > (day + 1) * DAY_MS ? [day, day + 1] : [day];
+        const charges = days.map((value) => ({
+          day: value,
+          blocks:
+            sql
+              .exec<{ blocks: number }>("SELECT blocks FROM usage WHERE day = ?", value)
+              .toArray()[0]?.blocks ?? 0,
+        }));
+        if (charges.some(({ blocks }) => blocks >= MAX_BLOCKS) || (!slot && active >= MAX_ACTIVE))
+          return null;
         sql.exec("INSERT OR REPLACE INTO slots VALUES (?, ?)", id, expires);
-        sql.exec("INSERT OR REPLACE INTO usage VALUES (?, ?)", day, blocks + 1);
+        for (const charge of charges)
+          sql.exec("INSERT OR REPLACE INTO usage VALUES (?, ?)", charge.day, charge.blocks + 1);
         return expires;
       });
       await this.schedule();
       return until;
     });
+  }
+
+  async active(id: string): Promise<boolean> {
+    return this.ctx.blockConcurrencyWhile(
+      async () =>
+        (this.tables()
+          .exec<{ until: number }>("SELECT until FROM slots WHERE id = ?", id)
+          .toArray()[0]?.until ?? 0) > Date.now(),
+    );
   }
 
   async release(id: string) {
@@ -50,16 +64,20 @@ export class SessionBudget extends DurableObject {
   }
 
   private async schedule() {
-    const value = this.tables()
+    const sql = this.tables();
+    const slot = sql
       .exec<{ next: number | null }>("SELECT MIN(until) AS next FROM slots")
       .one().next;
-    if (value === null) await this.ctx.storage.deleteAlarm();
+    const day = sql.exec<{ day: number | null }>("SELECT MIN(day) AS day FROM usage").one().day;
+    const value = Math.min(slot ?? Infinity, day === null ? Infinity : (day + 1) * DAY_MS);
+    if (!Number.isFinite(value)) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(value);
   }
 
   override async alarm() {
     await this.ctx.blockConcurrencyWhile(async () => {
       this.tables().exec("DELETE FROM slots WHERE until <= ?", Date.now());
+      this.tables().exec("DELETE FROM usage WHERE day < ?", Math.floor(Date.now() / DAY_MS));
       await this.schedule();
     });
   }

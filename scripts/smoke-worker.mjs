@@ -61,7 +61,10 @@ for (const environment of ["local", "production"]) {
       if ((await response.json()).storage !== "sqlite-ready")
         throw new Error("SQLite binding failed");
       await smokeProbeWorker(origin);
-      const restored = await exerciseSession(origin, "http://127.0.0.1:8787", { idleMs: 12000 });
+      const restored = await exerciseSession(origin, "http://127.0.0.1:8787", {
+        idleMs: 12000,
+        dailyBlocks: 4,
+      });
       if (!restored.constructorRestarted)
         throw new Error("Session constructor did not restart after idle");
       console.log("Session pairing, lease admission and restoration after hibernation passed.");

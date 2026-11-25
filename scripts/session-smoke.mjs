@@ -7,7 +7,7 @@ const { WebSocket } = createRequire(new URL("../apps/relay-local/package.json", 
   "ws",
 );
 
-export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
+export async function exerciseSession(base, origin, { key, idleMs = 0, dailyBlocks } = {}) {
   const sockets = new Set();
   const headers = { Origin: origin, ...(key ? { Authorization: `Bearer ${key}` } : {}) };
   const provision = () => fetch(`${base}/session`, { method: "POST", headers, redirect: "error" });
@@ -114,10 +114,20 @@ export async function exerciseSession(base, origin, { key, idleMs = 0 } = {}) {
     assert.equal((await resumed.next("ERROR")).code, "REVOKED");
     await state(pc, "connected", 3);
 
-    for (let i = 0; i < 7; i++) assert.equal((await provision()).status, 201);
+    for (let i = 1; i < (dailyBlocks ?? 8); i++) assert.equal((await provision()).status, 201);
     assert.equal((await provision()).status, 429);
     pc.send({ type: "END" });
     assert.equal((await replacement.next("ERROR")).code, "ROOM_EXPIRED");
+    if (dailyBlocks) {
+      assert.equal(
+        (await provision()).status,
+        429,
+        "Releasing a room must not refund its daily reservation",
+      );
+      return {
+        constructorRestarted: linked.boot !== undefined && linked.boot !== disconnected.boot,
+      };
+    }
     const deadline = Date.now() + 3000;
     let allocation;
     do {
