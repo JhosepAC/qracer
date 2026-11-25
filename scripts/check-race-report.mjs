@@ -114,12 +114,17 @@ for (const field of ["restarts", "rebuilds"]) {
     points.map((point) => point.usedSize),
     150 * 2 ** 20,
   );
-  const counts = new Set(points.map((point) => `${point.nodes}/${point.jsEventListeners}`));
+  const midpoint = Math.ceil(points.length / 2);
+  const peak = (group, key) => Math.max(...group.map((point) => point[key]));
+  const firstPeaks = ["nodes", "jsEventListeners"].map((key) =>
+    peak(points.slice(0, midpoint), key),
+  );
+  const lastPeaks = ["nodes", "jsEventListeners"].map((key) => peak(points.slice(midpoint), key));
   check(
     `stability/${field}/dom-listeners`,
-    counts.size === 1,
-    [...counts],
-    "stable within comparable checkpoints",
+    points.length > 1 && lastPeaks.every((value, index) => value <= firstPeaks[index]),
+    { firstPeaks, lastPeaks },
+    "no increasing DOM/listener peaks in the latter half",
   );
 }
 const result = {

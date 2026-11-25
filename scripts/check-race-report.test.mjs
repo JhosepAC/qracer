@@ -8,7 +8,13 @@ async function assess(change) {
   const dir = await mkdtemp(join(tmpdir(), "qracer-report-"));
   try {
     const sample = { samples: 100, p95: 16.70000000001 };
-    const point = { usedSize: 10000000, canvases: 1, nodes: 680, jsEventListeners: 103 };
+    const point = {
+      usedSize: 10000000,
+      canvases: 1,
+      nodes: 680,
+      jsEventListeners: 103,
+      renderer: { simulationTick: 60 },
+    };
     const report = {
       conditions: { warmup: 30 },
       runs: ["low", "balanced", "high"].flatMap((profile) =>
@@ -80,4 +86,17 @@ it("rejects missing timings and continued resource growth", async () => {
   });
   expect(code).toBe(1);
   expect(result.checks.filter((check) => !check.passed)).toHaveLength(2);
+});
+
+it("rejects listener accumulation across successive scene rebuilds", async () => {
+  const { code, result } = await assess((report) => {
+    report.stability.rebuilds = report.stability.rebuilds.map((point, index) => ({
+      ...point,
+      jsEventListeners: 103 + index,
+    }));
+  });
+  expect(code).toBe(1);
+  expect(
+    result.checks.find((check) => check.name === "stability/rebuilds/dom-listeners").passed,
+  ).toBe(false);
 });
