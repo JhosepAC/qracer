@@ -2,9 +2,9 @@ import { DurableObject } from "cloudflare:workers";
 import {
   type Effect,
   type Peer,
-  randomId,
   RoomSession,
   type RoomState,
+  randomId,
 } from "@qracer/session-core";
 import { SESSION_BYTES } from "@qracer/session-core/wire";
 import type { SessionBudget } from "./session-budget.ts";
@@ -14,6 +14,7 @@ export interface SessionEnv {
   SESSION_BUDGET?: DurableObjectNamespace<SessionBudget>;
   SESSION_ORIGINS?: string;
   SESSION_KEY?: string;
+  SESSION_DISABLED?: string;
   LOCAL_DIAGNOSTICS?: string;
 }
 
@@ -46,7 +47,11 @@ export class SessionRoom extends DurableObject<SessionEnv> {
       const room = new RoomSession(state, peers);
       this.room = room;
       room.reconcile(Date.now());
-      await this.flush(room, room.expire(Date.now()), 0);
+      await this.flush(
+        room,
+        this.env.SESSION_DISABLED === "true" ? room.stopAtQuota() : room.expire(Date.now()),
+        0,
+      );
     });
   }
 
@@ -137,6 +142,10 @@ export class SessionRoom extends DurableObject<SessionEnv> {
       const room = this.room;
       if (!room || !peer) return socket.close(1008, "Session unavailable");
       const revision = room.revision;
+      if (this.env.SESSION_DISABLED === "true") {
+        await this.flush(room, room.stopAtQuota(), revision);
+        return;
+      }
       const text =
         typeof raw === "string" &&
         raw.length <= SESSION_BYTES &&
@@ -174,7 +183,7 @@ export class SessionRoom extends DurableObject<SessionEnv> {
       if (!room) return;
       const now = Date.now();
       const revision = room.revision;
-      const effects = room.expire(now);
+      const effects = this.env.SESSION_DISABLED === "true" ? room.stopAtQuota() : room.expire(now);
       if (!room.state.ended && this.canRenew(room) && now >= room.state.leaseUntil - RENEW_NOTICE) {
         try {
           const until = await budget(this.env).reserve(room.state.id, room.state.leaseUntil);
