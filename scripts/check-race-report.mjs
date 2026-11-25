@@ -102,6 +102,12 @@ for (const field of ["restarts", "rebuilds"]) {
   const points = report.stability?.[field] ?? [];
   check(`stability/${field}`, points.length >= 20, points.length, 20);
   check(
+    `stability/${field}/real-racing`,
+    points.length > 0 && points.every((point) => point.renderer?.simulationTick >= 60),
+    points.map((point) => point.renderer?.simulationTick),
+    "at least one second of simulation after countdown",
+  );
+  check(
     `stability/${field}/heap`,
     points.length > 0 &&
       points.every((point) => point.usedSize <= 150 * 2 ** 20 && point.canvases === 1),

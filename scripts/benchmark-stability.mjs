@@ -51,7 +51,11 @@ export async function restartAudit(page, output, count = 20) {
   for (let i = 1; i <= count; i++) {
     await page.locator("#restart").click();
     await page.keyboard.down("ArrowUp");
-    await page.waitForFunction(() => Number(document.querySelector("#speed").textContent) > 20);
+    await page.waitForFunction(
+      () =>
+        JSON.parse(document.querySelector("#preview").dataset.renderStats || "{}").simulationTick >=
+        60,
+    );
     await page.keyboard.up("ArrowUp");
     await page.keyboard.press("Escape");
     restarts.push(await checkpoint(page, `restart/${i}`));
@@ -62,7 +66,11 @@ export async function restartAudit(page, output, count = 20) {
     await page.waitForSelector('#preview[data-graphics="ready"]');
     await page.locator("#start").click();
     await page.keyboard.down("ArrowUp");
-    await page.waitForFunction(() => Number(document.querySelector("#speed").textContent) > 20);
+    await page.waitForFunction(
+      () =>
+        JSON.parse(document.querySelector("#preview").dataset.renderStats || "{}").simulationTick >=
+        60,
+    );
     await page.keyboard.up("ArrowUp");
     await page.keyboard.press("Escape");
     rebuilds.push(await checkpoint(page, `rebuild/${i}`));
