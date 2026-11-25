@@ -10,6 +10,8 @@ test("caches only allowlisted static resources and reopens the real game offline
   test.setTimeout(60000);
   await prepareGraphics(page);
   const server = await offlineServer();
+  // The missing-download fixture stays unavailable even if deferred prefetch runs.
+  server.files.delete("/assets/world/desert.glb");
   try {
     await page.goto(`${server.origin}/play/`);
     await page.evaluate(async () => {
