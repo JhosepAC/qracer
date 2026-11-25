@@ -30,7 +30,14 @@ export function securityBuild(): Plugin {
         .map(([key, value]) => `  ${key}: ${value}`)
         .join("\n")}\n`;
       // Exact document routes avoid duplicate sensor directives in overlapping Pages rules.
-      for (const route of ["/", "/play/", "/controller/", "/probe/", "/probe/controller/"])
+      for (const route of [
+        "/",
+        "/play/",
+        "/controller/",
+        "/privacy/",
+        "/probe/",
+        "/probe/controller/",
+      ])
         for (const path of route === "/"
           ? ["/", "/index.html"]
           : [route.slice(0, -1), route, `${route}index.html`])

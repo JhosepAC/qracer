@@ -51,6 +51,7 @@ await writeFile(
     "Wait for the offline menu confirmation; download all environments to prepare desert and city.",
     "Updates wait until every PC tab returns to its menu. HTTP LAN stays online/tactile only.",
     "Tilt and wake lock require trusted HTTPS and a compatible browser. Sensor experiments: /probe/.",
+    "Privacy notice in Spanish and English: /privacy/ (also available after preparing offline downloads).",
     "For trusted LAN use QRACER_HOST and QRACER_ALLOWED_ORIGINS explicitly. Sensors require trusted HTTPS.",
     "",
   ].join("\n"),
