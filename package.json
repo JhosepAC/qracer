@@ -10,7 +10,8 @@
     "pnpm": "12.14.0"
   },
   "scripts": {
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm check:budgets && pnpm check:licenses",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm check:budgets && pnpm check:licenses && pnpm check:secrets",
+    "check:secrets": "node scripts/check-secrets.mjs",
     "check:worker": "node scripts/smoke-worker.mjs",
     "test:e2e": "playwright test",
     "benchmark:probe": "node scripts/benchmark-probe.mjs",
