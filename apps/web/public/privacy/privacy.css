@@ -1,0 +1,112 @@
+@font-face {
+  font-family: Barlow;
+  src: url("/assets/fonts/barlow-400.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: Rajdhani;
+  src: url("/assets/fonts/rajdhani-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+:root {
+  color-scheme: dark;
+  font-family: Barlow, "Segoe UI", sans-serif;
+  color: #f3f6f3;
+  background: #10171b;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  border-top: 4px solid #ffcb47;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 5vw;
+  border-bottom: 1px solid #34434a;
+}
+a {
+  color: #67e8db;
+  text-underline-offset: 0.25em;
+  overflow-wrap: anywhere;
+}
+a:focus-visible {
+  outline: 3px solid #67e8db;
+  outline-offset: 4px;
+}
+header a,
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+}
+.brand {
+  color: #f3f6f3;
+  font:
+    700 1.75rem Rajdhani,
+    sans-serif;
+  text-decoration: none;
+  letter-spacing: -0.055em;
+}
+h1 span,
+.brand span {
+  color: #ffcb47;
+}
+nav {
+  display: flex;
+  gap: 1rem;
+}
+main {
+  max-width: 60rem;
+  margin: auto;
+  padding: 3rem 6vw;
+}
+.eyebrow {
+  color: #67e8db;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+}
+h1 {
+  font:
+    700 clamp(2.8rem, 7vw, 5.5rem) / 1 Rajdhani,
+    sans-serif;
+  margin: 1rem 0;
+}
+.lead {
+  font-size: 1.25rem;
+  max-width: 36rem;
+  color: #c6d2d5;
+}
+article {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid #34434a;
+  scroll-margin-top: 1rem;
+}
+h2 {
+  font:
+    700 2rem Rajdhani,
+    sans-serif;
+}
+h3 {
+  margin-top: 2rem;
+  color: #ffcb47;
+  font-size: 1.1rem;
+}
+p {
+  line-height: 1.65;
+}
+.back {
+  margin-top: 2rem;
+}
+footer {
+  padding: 2rem 5vw;
+  color: #b5c5c8;
+  border-top: 1px solid #34434a;
+}
