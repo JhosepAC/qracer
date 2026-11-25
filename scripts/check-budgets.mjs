@@ -1,5 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
@@ -36,6 +36,7 @@ export async function checkBudgets(directory) {
   const manifest = JSON.parse(await readFile(join(directory, ".vite/manifest.json"), "utf8"));
   const report = JSON.parse(await readFile(join(directory, "bundle-report.json"), "utf8"));
   const results = {};
+  let initialFiles = new Set();
   for (const [entry, limit] of [
     ["play/index.html", 600 * 1024],
     ["controller/index.html", 120 * 1024],
@@ -58,15 +59,27 @@ export async function checkBudgets(directory) {
     if (compressed > limit)
       throw new Error(`${entry}: ${compressed} compressed bytes exceeds ${limit}`);
     results[entry] = { gzipBytes: compressed, limit };
+    if (entry === "play/index.html") initialFiles = new Set([...files, entry]);
   }
-  let total = 0;
+  let total = 0,
+    firstPlayBytes = 0;
   for await (const path of assetFiles(directory)) {
     const bytes = (await readFile(path)).byteLength;
     if (bytes > 8 * 1024 * 1024) throw new Error(`Asset exceeds 8 MiB: ${path}`);
     total += bytes;
+    const file = relative(directory, path).replaceAll("\\", "/");
+    if (
+      initialFiles.has(file) ||
+      file.startsWith("assets/coast/") ||
+      file === "assets/world/traffic.glb"
+    )
+      firstPlayBytes += bytes;
   }
   if (total > 35 * 1024 * 1024) throw new Error("Total download exceeds 35 MiB");
-  return { entries: results, totalBytes: total };
+  // Conservative uncompressed upper bound: all reachable PC chunks/fonts plus
+  // the initial coast kit and shared traffic. The optional world assets remain in the total budget.
+  if (firstPlayBytes > 8 * 1024 * 1024) throw new Error("First playable download exceeds 8 MiB");
+  return { entries: results, firstPlayUncompressedBytes: firstPlayBytes, totalBytes: total };
 }
 
 if (import.meta.main) {
