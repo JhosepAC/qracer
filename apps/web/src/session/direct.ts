@@ -27,6 +27,8 @@ export class DirectTransport {
   private epoch = -1;
   private count = 0;
   private windowAt = this.started;
+  private readonly encoder = new TextEncoder();
+  private readonly packetBytes = new Uint8Array(1024);
   private receivedPause = -1;
   private pause?: {
     frame: Extract<DriveFrame, { type: "DRIVE_PAUSE" }>;
@@ -170,7 +172,13 @@ export class DirectTransport {
     }
     channel.onclose = channel.onerror = () => this.fail();
     channel.onmessage = ({ data }) => {
-      if (this.closed || typeof data !== "string" || data.length > 1024) return this.fail();
+      if (
+        this.closed ||
+        typeof data !== "string" ||
+        data.length > this.packetBytes.length ||
+        this.encoder.encodeInto(data, this.packetBytes).read !== data.length
+      )
+        return this.fail();
       const now = performance.now();
       if (now - this.windowAt >= 1000) {
         this.count = 0;
@@ -287,6 +295,7 @@ export class DirectTransport {
     this.pc?.close();
     this.probes.clear();
     this.candidates.length = 0;
+    this.packetBytes.fill(0);
     delete this.pause;
   }
 }
