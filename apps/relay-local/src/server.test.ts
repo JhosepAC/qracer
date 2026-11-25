@@ -1,5 +1,8 @@
 import { once } from "node:events";
+import { mkdtemp, rm, rmdir, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { createRelay } from "./server.ts";
@@ -16,7 +19,11 @@ describe("local bootstrap relay", () => {
   afterEach(async () => relay.close());
 
   it("serves versioned health and rejects unsupported HTTP methods", async () => {
-    expect(await (await fetch(`${url}/health`)).json()).toEqual({
+    const response = await fetch(`${url}/health`);
+    expect(response.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
+    expect(response.headers.get("Permissions-Policy")).toContain("microphone=()");
+    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(await response.json()).toEqual({
       status: "ok",
       protocolVersion: 1,
     });
@@ -77,4 +84,27 @@ describe("local bootstrap relay", () => {
     peer.close();
     await once(peer, "close");
   });
+});
+
+it("fails closed with security headers if built relay configuration is malformed", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "qracer-policy-"));
+  try {
+    await writeFile(join(dir, "security-origins.json"), '["https://secret@relay.example"]');
+    const broken = createRelay({ staticDir: dir, allowedOrigins: [] });
+    try {
+      broken.server.listen(0, "127.0.0.1");
+      await once(broken.server, "listening");
+      const response = await fetch(
+        `http://127.0.0.1:${(broken.server.address() as AddressInfo).port}/health`,
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+      expect(await response.text()).not.toContain("secret");
+    } finally {
+      await broken.close();
+    }
+  } finally {
+    await rm(join(dir, "security-origins.json"), { force: true });
+    await rmdir(dir);
+  }
 });
