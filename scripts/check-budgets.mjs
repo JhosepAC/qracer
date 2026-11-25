@@ -45,6 +45,7 @@ export async function checkBudgets(directory) {
   ]) {
     let compressed = 0;
     const files = reachableFiles(manifest, entry);
+    if (entry === "play/index.html") files.add("decoder-worker.js");
     for (const file of files) {
       const source = await readFile(join(directory, file));
       compressed += gzipSync(source).byteLength;
