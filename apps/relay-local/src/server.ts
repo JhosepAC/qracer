@@ -2,8 +2,10 @@ import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { health, MAX_MESSAGE_BYTES, parseClientMessage, PROTOCOL_VERSION } from "@qracer/protocol";
+import { health, MAX_MESSAGE_BYTES, PROTOCOL_VERSION, parseClientMessage } from "@qracer/protocol";
+import { securityHeaders, securityOrigins } from "@qracer/protocol/security";
 import { WebSocketServer } from "ws";
+import { builtOrigins } from "./headers.ts";
 import { createProbe } from "./probe.ts";
 import { createSessions } from "./session.ts";
 
@@ -32,7 +34,9 @@ export function createRelay(options: {
   allowedOrigins: string[];
   probeKey?: string;
 }) {
-  const origins = new Set(options.allowedOrigins);
+  const trusted = securityOrigins(options.allowedOrigins);
+  const origins = new Set(trusted);
+  const built = builtOrigins(options.staticDir);
   const probe = createProbe(origins, options.probeKey);
   const sessions = createSessions(origins);
   const sockets = new WebSocketServer({
@@ -41,8 +45,16 @@ export function createRelay(options: {
     perMessageDeflate: false,
   });
   const server = createServer(async (request, response) => {
-    response.setHeader("X-Content-Type-Options", "nosniff");
-    response.setHeader("Referrer-Policy", "no-referrer");
+    const relays = await built;
+    const path = new URL(request.url ?? "/", "http://local").pathname;
+    for (const [name, value] of Object.entries(
+      securityHeaders(path, [...trusted, ...(relays ?? [])]),
+    ))
+      response.setHeader(name, value);
+    if (!relays) {
+      response.writeHead(503).end();
+      return;
+    }
     if (probe.request(request, response)) return;
     if (await sessions.request(request, response)) return;
     if (request.method !== "GET" && request.method !== "HEAD") {

@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./security": "./src/security.ts",
     "./version": "./src/version.ts"
   },
   "scripts": {
