@@ -1,6 +1,7 @@
 /** Source-language UI messages. Wire values, credentials and saved categories never pass here. */
 export const english: Readonly<Record<string, string>> = {
   Idioma: "Language",
+  Privacidad: "Privacy",
   "Tu mando": "Your controller",
   "El control": "Take control",
   "está en tus manos.": "from your phone.",

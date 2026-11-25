@@ -27,6 +27,7 @@ root.innerHTML = `
       ${controlsMarkup}
       <button type="button" class="button" id="leave" hidden>Cerrar conexión</button>
       <a class="text-link" href="/play/">Volver a QRacer</a>
+      <a class="text-link" href="/privacy/" target="_blank" rel="noopener noreferrer">Privacidad</a>
     </section>
   </main>`;
 

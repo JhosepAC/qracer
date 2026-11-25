@@ -31,6 +31,7 @@ root.dataset.mode = "menu";
 root.innerHTML = `
   <div id="preview" aria-hidden="true"></div>
   <header class="race-bar"><a class="brand" href="/play/">Q<span>Racer</span></a>
+    <a class="text-link" href="/privacy/" target="_blank" rel="noopener noreferrer">Privacidad</a>
     <button type="button" id="pause" hidden>Pausa <kbd>Esc</kbd></button></header>
   <main class="race-menu" id="menu">
     <section aria-labelledby="headline">

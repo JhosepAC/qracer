@@ -20,6 +20,8 @@ if (import.meta.main) {
   const selected = new Set([
     "/play/",
     "/decoder-worker.js",
+    "/privacy/",
+    "/privacy/privacy.css",
     "/LICENSE.txt",
     "/THIRD_PARTY_NOTICES.txt",
   ]);
@@ -39,7 +41,7 @@ if (import.meta.main) {
   }
   const entries = [];
   for (const url of [...selected].sort()) {
-    const data = await readFile(resolve(dist, `.${url === "/play/" ? "/play/index.html" : url}`));
+    const data = await readFile(resolve(dist, `.${url.endsWith("/") ? `${url}index.html` : url}`));
     entries.push({
       url,
       size: data.length,

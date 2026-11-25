@@ -5,6 +5,7 @@
   "compatibility_date": "2026-11-22",
   "workers_dev": false,
   "preview_urls": false,
+  "observability": { "enabled": false },
   "vars": { "LOCAL_DIAGNOSTICS": "false" },
   "durable_objects": {
     "bindings": [
@@ -20,6 +21,7 @@
   ],
   "env": {
     "production": {
+      "observability": { "enabled": false },
       "vars": { "LOCAL_DIAGNOSTICS": "false" },
       "durable_objects": {
         "bindings": [
@@ -30,6 +32,7 @@
       }
     },
     "local": {
+      "observability": { "enabled": false },
       "vars": {
         "LOCAL_DIAGNOSTICS": "true",
         "PROBE_ORIGINS": "http://127.0.0.1:5173,http://127.0.0.1:8787",
@@ -45,6 +48,7 @@
       }
     },
     "probe": {
+      "observability": { "enabled": false },
       "name": "qracer-f02-probe",
       "workers_dev": true,
       "vars": {
