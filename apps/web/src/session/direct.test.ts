@@ -160,3 +160,18 @@ it("bounds queued ICE candidates and closes on binary, oversized or flooding dir
   for (let i = 0; i < 101; i++) flood.actions.onmessage?.({ data: "healthy" });
   expect(flood.hooks.failed).toHaveBeenCalledTimes(1);
 });
+
+it("limits direct packets by UTF-8 bytes while accepting a valid 1 KiB ASCII frame", async () => {
+  const { direct, hooks, actions } = await setup();
+  const pause = { type: "DRIVE_PAUSE", epoch: 7, seq: 1 };
+  actions.onmessage?.({ data: JSON.stringify(pause).padEnd(1024, " ") });
+  expect(hooks.receive).toHaveBeenCalledTimes(1);
+  expect(direct.ready).toBe(true);
+  const oversized = JSON.stringify({ ...pause, seq: 2, padding: "é".repeat(600) });
+  expect(oversized.length).toBeLessThan(1024);
+  expect(new TextEncoder().encode(oversized).byteLength).toBeGreaterThan(1024);
+  actions.onmessage?.({ data: oversized });
+  expect(hooks.failed).toHaveBeenCalledTimes(1);
+  expect(hooks.receive).toHaveBeenCalledTimes(1);
+  expect(direct.ready).toBe(false);
+});
