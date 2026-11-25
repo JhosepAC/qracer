@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -7,6 +8,30 @@ if (!Array.isArray(report.runs)) throw new Error("Missing benchmark runs");
 const atMost = (value, limit) => Number.isFinite(value) && value >= 0 && value <= limit + 1e-6;
 const checks = [];
 const check = (name, passed, observed, limit) => checks.push({ name, passed, observed, limit });
+let auditSource;
+if (process.argv[3]) {
+  const auditPath = resolve(process.argv[3]);
+  const raw = await readFile(auditPath, "utf8");
+  const audit = JSON.parse(raw);
+  auditSource = {
+    path: auditPath,
+    reportSha256: createHash("sha256").update(raw).digest("hex"),
+    sourceCommit: audit.sourceCommit,
+    sourceTree: audit.sourceTree,
+    manifestSha256: audit.manifestSha256,
+  };
+  check(
+    "supplemental-audit/build",
+    typeof report.manifestSha256 === "string" && report.manifestSha256 === audit.manifestSha256,
+    audit.manifestSha256,
+    report.manifestSha256,
+  );
+  report.stability = {
+    ...report.stability,
+    restarts: audit.stability?.restarts,
+    rebuilds: audit.stability?.rebuilds,
+  };
+}
 const limits = {
   low: [33.4, 80, 150000, 1280, 720],
   balanced: [16.7, 120, 300000, 1920, 1080],
@@ -128,6 +153,7 @@ for (const field of ["restarts", "rebuilds"]) {
   );
 }
 const result = {
+  auditSource,
   sourceCommit: report.sourceCommit,
   sourceTree: report.sourceTree,
   manifestSha256: report.manifestSha256,
