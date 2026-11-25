@@ -1,21 +1,22 @@
 import {
   AUTH_MS,
-  isTransport,
-  NEGOTIATION_BYTES,
-  type TransportFrame,
   type ClientFrame,
   type Creation,
   type DriveFrame,
   type DriveRate,
-  permitInput,
   type ErrorCode,
   INVITE_MS,
+  isTransport,
+  MAX_PEER_MESSAGES,
   MAX_PEERS,
+  NEGOTIATION_BYTES,
   parseClient,
+  permitInput,
   RECONNECT_MS,
   ROOM_MS,
-  type ServerFrame,
   SESSION_VERSION,
+  type ServerFrame,
+  type TransportFrame,
 } from "./wire.ts";
 
 export interface Peer {
@@ -304,7 +305,7 @@ export class RoomSession {
       peer.transportControl = 0;
     }
     peer.total = (peer.total ?? 0) + 1;
-    const message = peer.total <= 50 ? parseClient(raw) : undefined;
+    const message = peer.total <= MAX_PEER_MESSAGES ? parseClient(raw) : undefined;
     if (!message || (!("epoch" in message) && ++peer.count > 8))
       return [this.reject(id, "INVALID"), ...this.remove(id, received)];
     if (!this.identified(id) && message.type !== "AUTH")

@@ -1,6 +1,9 @@
-import { parseTransport, type TransportFrame, SIGNAL_BYTES } from "./transport.ts";
+import { parseTransport, SIGNAL_BYTES, type TransportFrame } from "./transport.ts";
+
 export * from "./transport.ts";
+
 import { type DriveFrame, parseDriveFrame } from "./drive.ts";
+
 export * from "./drive.ts";
 
 export const SESSION_VERSION = 3;
@@ -13,6 +16,7 @@ export const AUTH_MS = 5_000;
 export const ROOM_MS = 2 * 60 * 60_000;
 export const LEASE_MS = 15 * 60_000;
 export const MAX_PEERS = 4;
+export const MAX_PEER_MESSAGES = 50;
 
 export type Role = "host" | "invite" | "resume";
 export type Phase = "waiting" | "pending" | "connected" | "reconnecting";
