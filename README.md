@@ -43,6 +43,9 @@ sin credenciales ni entradas crudas; el envío del frame no mide la latencia fí
 hasta la pantalla.
 
 - [Instrucciones para agentes](AGENTS.md)
+- [Seguridad, privacidad y operación gratuita](SECURITY.md). El aviso bilingüe
+  está en `/privacy/`, accesible desde PC y mando, también sin conexión tras
+  preparar las descargas.
 
 La planificación en `docs/` se mantiene local y está excluida del repositorio por decisión del propietario. Las reglas públicas de contribución están en [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -229,7 +232,7 @@ pnpm test:e2e
 pnpm package:local
 ```
 
-`check` ejecuta lint, formato, tipos, pruebas, build, presupuestos y licencias. El presupuesto sigue el grafo de imports estáticos/dinámicos y rechaza Three.js o módulos de PC dentro del mando. Las pruebas E2E usan Chromium; no certifican sensores o Safari/iPhone físicos.
+`check` ejecuta lint, formato, tipos, pruebas, build, presupuestos, licencias y detección de credenciales en distribuciones. El presupuesto sigue el grafo de imports estáticos/dinámicos y rechaza Three.js o módulos de PC dentro del mando. Las pruebas E2E usan Chromium; no certifican sensores o Safari/iPhone físicos.
 
 `pnpm check:pr <rama-base>` limita el PR a 12 archivos y 800 líneas de código/configuración. El lockfile generado sigue contando como archivo, pero se identifica separado del presupuesto de código. La instalación configura un hook local de Conventional Commits sin sustituir hooks personalizados existentes.
 
