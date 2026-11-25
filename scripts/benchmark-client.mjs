@@ -87,11 +87,15 @@ try {
     });
     for (const entry of ["controller", "play"])
       for (let run = 1; run <= 3; run++) {
-        const page = await browser.newPage();
+        const mobile = entry === "controller";
+        const page = await browser.newPage({
+          viewport: mobile ? { width: 390, height: 844 } : { width: 1920, height: 1080 },
+          isMobile: mobile,
+          hasTouch: mobile,
+        });
         const cdp = await page.context().newCDPSession(page);
         await cdp.send("Network.enable");
         await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
-        const mobile = entry === "controller";
         await cdp.send("Network.emulateNetworkConditions", {
           offline: false,
           latency: mobile ? 100 : 80,
@@ -198,6 +202,7 @@ try {
       await phone
         .getByRole("button", { name: "Acelerar", exact: true })
         .dispatchEvent("pointerdown", { pointerId: 1, button: 0 });
+      let interruption = "";
       const started = await phone.evaluate(() => performance.now());
       for (let elapsed = 0; elapsed < seconds; elapsed += 30) {
         await phone.waitForTimeout(Math.min(30, seconds - elapsed) * 1000);
@@ -210,24 +215,40 @@ try {
         };
         console.log("controller", progress);
         await writeFile(resolve(output, "progress.json"), JSON.stringify(progress));
-        if (progress.mode !== "playing") throw new Error("Unexpected controller pause/result");
+        if (progress.mode !== "playing") {
+          interruption =
+            (await pc.locator("#summary").textContent()) || `Unexpected mode: ${progress.mode}`;
+          break;
+        }
       }
       const elapsedMs =
         (await phone.evaluate(() => {
           clearInterval(window.controllerBench);
           return performance.now();
         })) - started;
-      await phone.getByRole("button", { name: "Pausa", exact: true }).click();
-      await pc.waitForSelector('#app[data-mode="paused"]');
+      if ((await pc.locator("#app").getAttribute("data-mode")) === "playing") {
+        await phone.getByRole("button", { name: "Pausa", exact: true }).click();
+        await pc.waitForSelector('#app[data-mode="paused"]');
+      }
       await phone.getByText("Ajustes y diagnóstico", { exact: true }).click();
       const handset = await diagnostic(phone, "#drive-diagnostic", `${route}-handset.json`);
       const after = await heap(phone);
-      await pc.locator("#return-menu").click();
+      if ((await pc.locator("#app").getAttribute("data-mode")) !== "menu")
+        await pc.locator("#return-menu").click();
       await pc.getByRole("button", { name: "Datos locales", exact: true }).click();
       const host = await diagnostic(pc, "#data-performance", `${route}-host.json`);
-      report.controller.push({ route, elapsedMs, handset, host, heap: { before, after }, errors });
+      report.controller.push({
+        route,
+        elapsedMs,
+        interruption,
+        handset,
+        host,
+        heap: { before, after },
+        errors,
+      });
       await save();
       if (
+        interruption ||
         errors.length ||
         after.usedSize > 30 * 2 ** 20 ||
         !host.pipeline.receiptToSimulationMs.samples ||

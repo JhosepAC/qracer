@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-async function assess(change) {
+async function assess(change, auditChange) {
   const dir = await mkdtemp(join(tmpdir(), "qracer-report-"));
   try {
     const sample = { samples: 100, p95: 16.70000000001 };
@@ -16,6 +16,7 @@ async function assess(change) {
       renderer: { simulationTick: 60 },
     };
     const report = {
+      manifestSha256: "a".repeat(64),
       conditions: { warmup: 30 },
       runs: ["low", "balanced", "high"].flatMap((profile) =>
         [1, 2, 3].map((run) => ({
@@ -54,16 +55,27 @@ async function assess(change) {
     change(report);
     const path = join(dir, "report.json");
     await writeFile(path, JSON.stringify(report));
-    const process = spawnSync(
-      globalThis.process.execPath,
-      ["scripts/check-race-report.mjs", path],
-      { encoding: "utf8", windowsHide: true },
-    );
+    const args = ["scripts/check-race-report.mjs", path];
+    if (auditChange) {
+      const audit = {
+        manifestSha256: report.manifestSha256,
+        stability: structuredClone(report.stability),
+      };
+      auditChange(audit);
+      const auditPath = join(dir, "audit.json");
+      await writeFile(auditPath, JSON.stringify(audit));
+      args.push(auditPath);
+    }
+    const process = spawnSync(globalThis.process.execPath, args, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
     return {
       code: process.status,
       result: JSON.parse(await readFile(join(dir, "report.acceptance.json"), "utf8")),
     };
   } finally {
+    await rm(join(dir, "audit.json"), { force: true });
     await rm(join(dir, "report.json"), { force: true });
     await rm(join(dir, "report.acceptance.json"), { force: true });
     await rmdir(dir);
@@ -98,5 +110,18 @@ it("rejects listener accumulation across successive scene rebuilds", async () =>
   expect(code).toBe(1);
   expect(
     result.checks.find((check) => check.name === "stability/rebuilds/dom-listeners").passed,
+  ).toBe(false);
+});
+
+it("refuses a supplemental stability audit from a different build", async () => {
+  const result = await assess(
+    () => {},
+    (audit) => {
+      audit.manifestSha256 = "b".repeat(64);
+    },
+  );
+  expect(result.code).toBe(1);
+  expect(
+    result.result.checks.find((check) => check.name === "supplemental-audit/build").passed,
   ).toBe(false);
 });

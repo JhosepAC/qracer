@@ -26,6 +26,8 @@ solo en pausa. No recompiles ni ejecutes otras pruebas gráficas durante el ensa
 Añade `--adaptive` para medir el ajuste automático. Los snapshots de heap y los
 informes quedan en `artifacts/race-benchmark/`. Comprueba los criterios con
 `node scripts/check-race-report.mjs`; un incumplimiento devuelve código de salida 1.
+Puedes añadir como segundo argumento otro `report.json` con la auditoría de reinicios;
+el verificador exige que ambos informes identifiquen el mismo build y conserva su procedencia.
 
 `node scripts/benchmark-client.mjs` mide arranque con red limitada y procesamiento
 del mando en Chromium local; `--mode startup` o `--mode controller` los separa.
