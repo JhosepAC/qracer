@@ -71,13 +71,13 @@ export async function checkBudgets(directory) {
     if (
       initialFiles.has(file) ||
       file.startsWith("assets/coast/") ||
-      file === "assets/world/traffic.glb"
+      file.startsWith("assets/world/")
     )
       firstPlayBytes += bytes;
   }
   if (total > 35 * 1024 * 1024) throw new Error("Total download exceeds 35 MiB");
   // Conservative uncompressed upper bound: all reachable PC chunks/fonts plus
-  // the initial coast kit and shared traffic. The optional world assets remain in the total budget.
+  // the coast kit and world prefetch, which can overlap initial shader warm-up.
   if (firstPlayBytes > 8 * 1024 * 1024) throw new Error("First playable download exceeds 8 MiB");
   return { entries: results, firstPlayUncompressedBytes: firstPlayBytes, totalBytes: total };
 }

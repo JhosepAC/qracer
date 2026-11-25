@@ -60,7 +60,7 @@ it("enforces the first-play total even when each asset and the whole distributio
     await writeFile(join(dir, "bundle-report.json"), JSON.stringify({ "app.js": { modules: [] } }));
     await writeFile(join(dir, "app.js"), "x");
     await writeFile(join(dir, "play/index.html"), "x");
-    await writeFile(join(dir, "assets/coast/a.glb"), Buffer.alloc(4 * 1024 * 1024 - 30));
+    await writeFile(join(dir, "assets/coast/a.glb"), Buffer.alloc(3 * 1024 * 1024 - 30));
     await writeFile(join(dir, "assets/coast/b.glb"), Buffer.alloc(4 * 1024 * 1024 - 10));
     await writeFile(join(dir, "assets/world/traffic.glb"), Buffer.alloc(20));
     await writeFile(join(dir, "assets/world/city.glb"), Buffer.alloc(1024 * 1024));
